@@ -82,3 +82,4 @@ Parametri: numero notti, numero ospiti, canale, giorno arrivo, storico soggiorni
 ## Licenza
 
 Uso interno / progetto.
+# customer-segmentation
