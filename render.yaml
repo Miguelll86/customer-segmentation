@@ -1,0 +1,13 @@
+# Deploy backend su Render: Dashboard → New Web Service → Connetti repo
+# Oppure usa questo file: Render rileva render.yaml e propone i servizi.
+services:
+  - type: web
+    name: customer-segmentation-api
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app.main:app
+    envVars:
+      - key: CORS_ORIGINS
+        sync: false
+        # Imposta dopo il deploy del frontend: https://TUO-SITO.vercel.app

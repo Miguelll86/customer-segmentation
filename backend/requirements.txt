@@ -1,0 +1,8 @@
+# Backend compatibile Python 3.14 (no Pydantic/FastAPI)
+# Solo Flask + pandas per upload Excel e segmentazione
+Flask>=3.0.0
+flask-cors>=4.0.0
+pandas>=2.0.0
+openpyxl>=3.1.0
+# Per deploy su Render (usa Python 3.12 sul server se 3.14 non supportato)
+gunicorn>=21.0.0
