@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { Upload, BarChart3, Users, Megaphone } from 'lucide-react';
 import Link from 'next/link';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
+// Base senza /api finale, per evitare URL tipo .../api/api/upload (404)
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/api\/?$/, '').replace(/\/$/, '');
 
 export default function HomePage() {
   const [file, setFile] = useState<File | null>(null);
@@ -25,11 +26,23 @@ export default function HomePage() {
       formData.append('file', file);
       const url = API_BASE ? `${API_BASE}/api/upload` : '/api/upload';
       const res = await fetch(url, { method: 'POST', body: formData });
-      const data = await res.json();
+      let data: { detail?: string; analysis_id?: string };
+      try {
+        data = await res.json();
+      } catch {
+        if (!res.ok) setError(`Errore ${res.status}. Avvia il backend (porta 8000) e riprova.`);
+        else setError('Risposta non valida dal server.');
+        return;
+      }
       if (!res.ok) throw new Error(data.detail || 'Upload fallito');
       setAnalysisId(data.analysis_id);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Errore di caricamento');
+      const msg = err instanceof Error ? err.message : 'Errore di caricamento';
+      if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('Load failed')) {
+        setError('Impossibile contattare il backend. Avvia il server (cd backend && python -m flask run o python app/main.py sulla porta 8000) e riprova.');
+      } else {
+        setError(msg);
+      }
     } finally {
       setLoading(false);
     }

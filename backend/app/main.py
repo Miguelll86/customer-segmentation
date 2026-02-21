@@ -55,7 +55,14 @@ def upload_excel():
                 abort(400, "Il file CSV è vuoto")
             df = pd.DataFrame(rows)
         else:
-            df = pd.read_excel(io.BytesIO(contents), engine="openpyxl", dtype=str)
+            # .xlsx con openpyxl; .xls con xlrd (se installato)
+            engine = "openpyxl" if fn.endswith(".xlsx") else None
+            try:
+                df = pd.read_excel(io.BytesIO(contents), engine=engine, dtype=str)
+            except Exception as xls_err:
+                if fn.endswith(".xls"):
+                    abort(400, "File .xls non supportato. In Excel: File → Salva con nome → formato 'Cartella di lavoro Excel (.xlsx)' o 'CSV UTF-8', poi ricarica.")
+                raise xls_err
             df = df.replace({"nan": None, "": None, "NaN": None})
     except Exception as e:
         err_msg = str(e)
@@ -71,6 +78,8 @@ def upload_excel():
         if "pattern" in err_msg.lower() or "match" in err_msg.lower() or "expected" in err_msg.lower():
             abort(400, "Errore nei dati. Controlla date e numeri (usa formato 2024-01-15 per le date).")
         abort(400, f"Errore elaborazione: {err_msg}")
+    if not customers:
+        abort(400, "Nessuna riga analizzata. Controlla che il file abbia la prima riga con le intestazioni (es. numero notti, numero ospiti, canale, data arrivo, ...). Vedi istruzioni nella pagina.")
     analysis_id = str(uuid.uuid4())
     _store[analysis_id] = customers
     return jsonify({

@@ -18,7 +18,8 @@ import {
   CartesianGrid,
 } from 'recharts';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
+// Base senza /api finale, per evitare URL tipo .../api/api/analysis/... (404)
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/api\/?$/, '').replace(/\/$/, '');
 const SEGMENT_COLORS: Record<string, string> = {
   Business: '#0ea5e9',
   Leisure: '#22c55e',
@@ -75,9 +76,10 @@ type Marketing = {
 
 function fetchApi<T>(path: string): Promise<T> {
   const url = API_BASE ? `${API_BASE}${path}` : path;
-  return fetch(url).then((r) => {
-    if (!r.ok) throw new Error('Network error');
-    return r.json();
+  return fetch(url).then(async (r) => {
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error((data as { detail?: string }).detail || `Errore ${r.status}`);
+    return data as T;
   });
 }
 
@@ -94,7 +96,12 @@ export default function DashboardPage() {
   const perPage = 20;
 
   useEffect(() => {
-    if (!id) return;
+    if (!id) {
+      setLoading(false);
+      return;
+    }
+    setError(null);
+    setLoading(true);
     Promise.all([
       fetchApi<Overview>(`/api/analysis/${id}/overview`),
       fetchApi<Marketing>(`/api/analysis/${id}/marketing`),
@@ -119,6 +126,16 @@ export default function DashboardPage() {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <p className="text-[var(--muted)]">Caricamento dashboard...</p>
+      </div>
+    );
+  }
+  if (!id) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4">
+        <p className="text-[var(--muted)]">ID analisi non disponibile. Torna all’upload e clicca su &quot;Apri dashboard&quot; dopo aver caricato un file.</p>
+        <Link href="/" className="btn-secondary flex items-center gap-2">
+          <ArrowLeft className="h-4 w-4" /> Torna all’upload
+        </Link>
       </div>
     );
   }
