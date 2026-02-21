@@ -35,7 +35,7 @@ export default function HomePage() {
         return;
       }
       if (!res.ok) throw new Error(data.detail || 'Upload fallito');
-      setAnalysisId(data.analysis_id);
+      setAnalysisId(data.analysis_id ?? null);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Errore di caricamento';
       if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('Load failed')) {
