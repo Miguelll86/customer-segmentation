@@ -58,6 +58,10 @@ type CustomerRow = {
   data_arrivo: string | null;
   categoria_camera: string | null;
   revenue: number | null;
+  anticipo_giorni: number | null;
+  prenotante: string | null;
+  numero_bambini: number | null;
+  operator_feedback?: Record<string, unknown> | null;
 };
 
 type MarketingSegment = {
@@ -73,6 +77,13 @@ type MarketingSegment = {
 type Marketing = {
   segmenti: MarketingSegment[];
 };
+
+type IndicatoreDef = { key: string; segment: string; label: string };
+
+const SERVIZI_OPTIONS = [
+  'Colazione inclusa', 'Sala meeting', 'Spa', 'Transfer', 'Culla', 'Letto aggiunto',
+  'Late check-out', 'Cena', 'Parcheggio', 'Pet friendly', 'Fattura aziendale', 'Upgrade',
+];
 
 const SEGMENT_LABELS: Record<string, string> = {
   business: 'Business',
@@ -114,9 +125,50 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerRow | null>(null);
+  const [customerDetail, setCustomerDetail] = useState<CustomerRow | null>(null);
   const [profileUpdated, setProfileUpdated] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [operatorSegment, setOperatorSegment] = useState('');
+  const [operatorNote, setOperatorNote] = useState('');
+  const [notePrenotazione, setNotePrenotazione] = useState('');
+  const [richiesteSpeciali, setRichiesteSpeciali] = useState('');
+  const [serviziSelezionati, setServiziSelezionati] = useState<string[]>([]);
+  const [indicatoriSelezionati, setIndicatoriSelezionati] = useState<string[]>([]);
+  const [indicatoriDefinitions, setIndicatoriDefinitions] = useState<IndicatoreDef[]>([]);
+  const [feedbackSaving, setFeedbackSaving] = useState(false);
+  const [feedbackSaved, setFeedbackSaved] = useState(false);
   const perPage = 20;
+
+  useEffect(() => {
+    const base = API_BASE || '';
+    fetch(base + '/api/operator-indicators')
+      .then((r) => r.json())
+      .then((data: { indicatori?: IndicatoreDef[] }) => setIndicatoriDefinitions(data.indicatori || []))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!id || !selectedCustomer) {
+      setCustomerDetail(null);
+      setFeedbackSaved(false);
+      return;
+    }
+    setFeedbackSaved(false);
+    fetchApi<CustomerRow>(`/api/analysis/${id}/customer/${selectedCustomer.row_index}`)
+      .then((d) => {
+        setCustomerDetail(d);
+        const fb = (d as CustomerRow & { operator_feedback?: Record<string, unknown> }).operator_feedback;
+        setOperatorSegment((fb?.segment as string) ?? d.segment ?? '');
+        setOperatorNote('');
+        setNotePrenotazione((fb?.note_prenotazione as string) ?? '');
+        setRichiesteSpeciali((fb?.richieste_speciali as string) ?? '');
+        setServiziSelezionati(Array.isArray(fb?.servizi_selezionati) ? (fb.servizi_selezionati as string[]) : []);
+        setIndicatoriSelezionati(Array.isArray(fb?.indicatori) ? (fb.indicatori as string[]) : []);
+      })
+      .catch(() => setCustomerDetail(selectedCustomer));
+  }, [id, selectedCustomer?.row_index]);
+
+  const displayCustomer = customerDetail ?? selectedCustomer;
 
   useEffect(() => {
     if (!id) {
@@ -307,13 +359,16 @@ export default function DashboardPage() {
                     <th className="p-3">Giorno</th>
                     <th className="p-3">Storico</th>
                     <th className="p-3">Spesa media</th>
-                    <th className="p-3">Revenue</th>
-                    <th className="p-3">Score (B/L/C/F/P)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {customers.map((c) => (
-                    <tr key={c.row_index} className="border-b border-[var(--border)]/50 hover:bg-white/5">
+<th className="p-3">Revenue</th>
+                                                    <th className="p-3">Anticipo</th>
+                                                    <th className="p-3">Prenotante</th>
+                                                    <th className="p-3">Bambini</th>
+                                                    <th className="p-3">Score (B/L/C/F/P)</th>
+                                                  </tr>
+                                                </thead>
+                                                <tbody>
+                                                  {customers.map((c) => (
+                                                    <tr key={c.row_index} className="border-b border-[var(--border)]/50 hover:bg-white/5">
                       <td className="p-3">{c.row_index + 1}</td>
                       <td className="p-3">
                         <button
@@ -338,11 +393,14 @@ export default function DashboardPage() {
                       <td className="p-3">{c.giorno_arrivo ?? '-'}</td>
                       <td className="p-3">{c.storico_soggiorni ?? '-'}</td>
                       <td className="p-3">{c.spesa_media != null ? `€ ${c.spesa_media.toFixed(0)}` : '-'}</td>
-                      <td className="p-3">{c.revenue != null ? `€ ${c.revenue.toFixed(0)}` : '-'}</td>
-                      <td className="p-3 font-mono text-xs">
-                        {c.scores?.business ?? 0}/{c.scores?.leisure ?? 0}/{c.scores?.coppia ?? 0}/{c.scores?.famiglia ?? 0}/{c.scores?.premium ?? 0}
-                      </td>
-                    </tr>
+<td className="p-3">{c.revenue != null ? `€ ${c.revenue.toFixed(0)}` : '-'}</td>
+                                                      <td className="p-3">{c.anticipo_giorni != null ? `${c.anticipo_giorni} gg` : '-'}</td>
+                                                      <td className="p-3">{c.prenotante ?? '-'}</td>
+                                                      <td className="p-3">{c.numero_bambini != null ? c.numero_bambini : '-'}</td>
+                                                      <td className="p-3 font-mono text-xs">
+                                                        {c.scores?.business ?? 0}/{c.scores?.leisure ?? 0}/{c.scores?.coppia ?? 0}/{c.scores?.famiglia ?? 0}/{c.scores?.premium ?? 0}
+                                                      </td>
+                                                    </tr>
                   ))}
                 </tbody>
               </table>
@@ -369,7 +427,7 @@ export default function DashboardPage() {
         </section>
 
         {/* Scheda cliente (modal) */}
-        {selectedCustomer && (
+        {selectedCustomer && displayCustomer && (
           <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
             onClick={() => setSelectedCustomer(null)}
@@ -383,7 +441,7 @@ export default function DashboardPage() {
             >
               <div className="flex items-center justify-between border-b border-[var(--border)] pb-3 mb-4">
                 <h2 id="scheda-cliente-title" className="text-lg font-semibold text-[var(--text)]">
-                  {selectedCustomer.nome_cliente || selectedCustomer.cliente_id || 'Cliente'}
+                  {displayCustomer.nome_cliente || displayCustomer.cliente_id || 'Cliente'}
                 </h2>
                 <button
                   type="button"
@@ -395,19 +453,21 @@ export default function DashboardPage() {
                 </button>
               </div>
               <p className="text-sm text-[var(--muted)] mb-4">
-                Segmento attuale: <strong className="text-[var(--text)]" style={{ color: SEGMENT_COLORS[selectedCustomer.segment] }}>{selectedCustomer.segment}</strong>
-                {selectedCustomer.data_arrivo && <> · Arrivo {selectedCustomer.data_arrivo}</>}
+                Segmento: <strong className="text-[var(--text)]" style={{ color: SEGMENT_COLORS[displayCustomer.segment] }}>{displayCustomer.segment}</strong>
+                {displayCustomer.data_arrivo && <> · Arrivo {displayCustomer.data_arrivo}</>}
+                {displayCustomer.operator_feedback?.updated_at && (
+                  <span className="ml-2 text-xs text-emerald-400">(aggiornato da operatore)</span>
+                )}
               </p>
-              <p className="text-sm font-medium text-[var(--text)] mb-2">Prospettiva cliente – percentuali per segmento</p>
+              <p className="text-sm font-medium text-[var(--text)] mb-2">Prime due categorie (scoring %)</p>
               <ul className="space-y-2 mb-6">
                 {(() => {
-                  const percentages = scoresToPercentages(selectedCustomer.scores || {});
-                  const sorted = [...percentages].sort((a, b) => b.percent - a.percent);
-                  const topTwo = new Set(sorted.slice(0, 2).map((s) => s.segment));
-                  return percentages.map(({ segment, percent }) => (
+                  const percentages = scoresToPercentages(displayCustomer.scores || {});
+                  const topTwoOnly = [...percentages].sort((a, b) => b.percent - a.percent).slice(0, 2);
+                  return topTwoOnly.map(({ segment, percent }) => (
                     <li
                       key={segment}
-                      className={`flex items-center justify-between rounded-lg px-3 py-2 ${topTwo.has(segment) ? 'ring-2 ring-[var(--accent)] bg-[var(--accent)]/10 font-semibold' : 'bg-white/5'}`}
+                      className="flex items-center justify-between rounded-lg px-3 py-2 ring-2 ring-[var(--accent)] bg-[var(--accent)]/10 font-semibold"
                     >
                       <span style={{ color: SEGMENT_COLORS[segment] || 'var(--text)' }}>{segment}</span>
                       <span className="font-mono text-sm">{percent}%</span>
@@ -415,6 +475,137 @@ export default function DashboardPage() {
                   ));
                 })()}
               </ul>
+
+              <div className="border-t border-[var(--border)] pt-4 mb-4 space-y-4">
+                <p className="text-sm font-medium text-[var(--text)]">Input operatore – raffina il segmento</p>
+                <p className="text-xs text-[var(--muted)]">Analizza note, richieste e servizi; seleziona gli indicatori comportamentali. In caso di sovrapposizione: Business → Famiglie → Premium → Coppie → Leisure.</p>
+
+                <label className="block">
+                  <span className="mb-1 block text-xs text-[var(--muted)]">Note di prenotazione</span>
+                  <textarea
+                    value={notePrenotazione}
+                    onChange={(e) => setNotePrenotazione(e.target.value)}
+                    className="input w-full min-h-[56px]"
+                    placeholder="Testo dalle note di prenotazione..."
+                    rows={2}
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-xs text-[var(--muted)]">Richieste speciali</span>
+                  <textarea
+                    value={richiesteSpeciali}
+                    onChange={(e) => setRichiesteSpeciali(e.target.value)}
+                    className="input w-full min-h-[56px]"
+                    placeholder="Richieste particolari del cliente..."
+                    rows={2}
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-xs text-[var(--muted)]">Servizi selezionati</span>
+                  <div className="flex flex-wrap gap-2">
+                    {SERVIZI_OPTIONS.map((s) => (
+                      <label key={s} className="flex cursor-pointer items-center gap-1.5 rounded border border-[var(--border)] px-2 py-1 text-xs hover:bg-white/5">
+                        <input
+                          type="checkbox"
+                          checked={serviziSelezionati.includes(s)}
+                          onChange={(e) => setServiziSelezionati((prev) => e.target.checked ? [...prev, s] : prev.filter((x) => x !== s))}
+                        />
+                        {s}
+                      </label>
+                    ))}
+                  </div>
+                </label>
+                <div>
+                  <span className="mb-2 block text-xs text-[var(--muted)]">Indicatori comportamentali (classifica nel segmento più coerente)</span>
+                  <div className="space-y-3">
+                    {['Business', 'Famiglia', 'Coppia', 'Premium', 'Leisure'].map((seg) => {
+                      const items = indicatoriDefinitions.filter((i) => i.segment === seg);
+                      if (items.length === 0) return null;
+                      return (
+                        <div key={seg} className="rounded border border-[var(--border)]/60 bg-white/5 p-2">
+                          <p className="mb-1.5 text-xs font-medium" style={{ color: SEGMENT_COLORS[seg] }}>{seg}</p>
+                          <div className="flex flex-wrap gap-x-3 gap-y-1">
+                            {items.map((ind) => (
+                              <label key={ind.key} className="flex cursor-pointer items-center gap-1.5 text-xs">
+                                <input
+                                  type="checkbox"
+                                  checked={indicatoriSelezionati.includes(ind.key)}
+                                  onChange={(e) => setIndicatoriSelezionati((prev) => e.target.checked ? [...prev, ind.key] : prev.filter((k) => k !== ind.key))}
+                                />
+                                {ind.label}
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                <label className="block">
+                  <span className="mb-1 block text-xs text-[var(--muted)]">Segmento confermato / override (opzionale)</span>
+                  <select
+                    value={operatorSegment}
+                    onChange={(e) => setOperatorSegment(e.target.value)}
+                    className="input w-full"
+                  >
+                    <option value="">— Calcola da indicatori sopra —</option>
+                    <option value="Business">Business</option>
+                    <option value="Leisure">Leisure</option>
+                    <option value="Coppia">Coppia</option>
+                    <option value="Famiglia">Famiglia</option>
+                    <option value="Premium">Premium</option>
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-xs text-[var(--muted)]">Note operative</span>
+                  <textarea
+                    value={operatorNote}
+                    onChange={(e) => setOperatorNote(e.target.value)}
+                    className="input w-full min-h-[48px]"
+                    placeholder="Motivo correzione, contesto..."
+                    rows={1}
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setFeedbackSaving(true);
+                    setFeedbackSaved(false);
+                    try {
+                      const url = API_BASE ? `${API_BASE}/api/analysis/${id}/customer/${selectedCustomer.row_index}/feedback` : `/api/analysis/${id}/customer/${selectedCustomer.row_index}/feedback`;
+                      const res = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          segment: operatorSegment || undefined,
+                          note_prenotazione: notePrenotazione || undefined,
+                          richieste_speciali: richiesteSpeciali || undefined,
+                          servizi_selezionati: serviziSelezionati.length ? serviziSelezionati : undefined,
+                          indicatori: indicatoriSelezionati.length ? indicatoriSelezionati : undefined,
+                          note: operatorNote || undefined,
+                        }),
+                      });
+                      const data = await res.json().catch(() => ({}));
+                      setFeedbackSaved(true);
+                      const updated = await fetchApi<CustomerRow>(`/api/analysis/${id}/customer/${selectedCustomer.row_index}`);
+                      setCustomerDetail(updated);
+                      if (data.segment) setOperatorSegment(data.segment);
+                    } catch {
+                      setFeedbackSaved(false);
+                    } finally {
+                      setFeedbackSaving(false);
+                    }
+                  }}
+                  disabled={feedbackSaving}
+                  className="btn-primary w-full disabled:opacity-50"
+                >
+                  {feedbackSaving ? 'Salvataggio...' : 'Salva e aggiorna segmento'}
+                </button>
+                {feedbackSaved && (
+                  <p className="text-sm text-emerald-400">Input salvato. Segmento aggiornato in base a note, richieste e indicatori.</p>
+                )}
+              </div>
+
               {profileUpdated ? (
                 <p className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300">
                   Profilo aggiornato. Elaborato con i dati attuali del soggiorno.
@@ -429,13 +620,13 @@ export default function DashboardPage() {
                       await fetch(url, { method: 'POST' });
                       setProfileUpdated(true);
                     } catch {
-                      setProfileUpdated(true); // mostra messaggio anche se API non disponibile (demo)
+                      setProfileUpdated(true);
                     } finally {
                       setRefreshing(false);
                     }
                   }}
                   disabled={refreshing}
-                  className="btn-primary flex w-full items-center justify-center gap-2 disabled:opacity-50"
+                  className="btn-secondary flex w-full items-center justify-center gap-2 disabled:opacity-50"
                 >
                   <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
                   {refreshing ? 'Elaborazione...' : 'Elabora profilo definitivo durante il soggiorno'}

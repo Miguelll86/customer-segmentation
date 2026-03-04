@@ -57,15 +57,37 @@ def compute_scores(
     categoria_camera: str,
     threshold_top25: float | None,
     is_vacation_period: bool,
+    media_spesa: float | None = None,
+    anticipo_giorni: int | None = None,
+    prenotante: str | None = None,
+    numero_bambini: int | None = None,
 ) -> Scores:
-    """Calcola i 5 punteggi per un singolo record."""
+    """Calcola i 5 punteggi per un singolo record (combinazioni giorno+notti, spesa, anticipo, prenotante, bambini)."""
     cn = _norm(canale)
     gn = _norm(giorno_arrivo)
+    is_weekend = gn in {"ven", "sab", "dom", "venerdì", "sabato", "domenica", "friday", "saturday", "sunday"}
+    is_midweek = gn in GIORNI_MIDWEEK
     business = leisure = coppia = famiglia = premium = 0
 
-    # BUSINESS
-    if gn in GIORNI_MIDWEEK:
+    # --- Combinazioni giorno arrivo + numero notti ---
+    if is_weekend and numero_notti == 1:
+        business += 2  # weekend breve spesso business
+        coppia += 1
+    if is_weekend and 2 <= numero_notti <= 3:
+        coppia += 3
+        leisure += 2
+    if is_weekend and numero_notti >= 4:
+        famiglia += 2
+        leisure += 1
+    if is_midweek and 1 <= numero_notti <= 2:
         business += 3
+    if is_midweek and numero_notti >= 3:
+        leisure += 1
+        famiglia += 1
+
+    # --- BUSINESS ---
+    if gn in GIORNI_MIDWEEK:
+        business += 2
     if numero_ospiti == 1:
         business += 3
     if 1 <= numero_notti <= 2:
@@ -74,18 +96,34 @@ def compute_scores(
         business += 2
     if storico_soggiorni > 0 and numero_notti <= 2:
         business += 1
+    # Anticipo: last minute (0-7 giorni) spesso business
+    if anticipo_giorni is not None and 0 <= anticipo_giorni <= 7:
+        business += 2
+    # Prenotante: agenzia/azienda/tour operator → business
+    if prenotante:
+        pn = _norm(prenotante)
+        if any(x in pn for x in ["agenzia", "agency", "azienda", "corporate", "tour operator", "to ", "gds", "business"]):
+            business += 2
 
-    # LEISURE
+    # --- LEISURE ---
     if numero_notti >= 3:
         leisure += 2
-    if gn in {"ven", "sab", "dom", "venerdì", "sabato", "domenica", "friday", "saturday", "sunday"}:
+    if is_weekend:
         leisure += 1
     if any(x in cn for x in ["ota", "booking", "expedia", "leisure"]):
         leisure += 2
     if storico_soggiorni == 0:
         leisure += 1
+    # Spesa sotto media → spesso leisure
+    if media_spesa is not None and spesa_media is not None and spesa_media < media_spesa:
+        leisure += 1
+    # Prenotazione in anticipo (30+ giorni) → leisure
+    if anticipo_giorni is not None and anticipo_giorni >= 30:
+        leisure += 1
+    if prenotante and ("cliente" in _norm(prenotante) or "guest" in _norm(prenotante)):
+        leisure += 1
 
-    # COPPIA
+    # --- COPPIA ---
     if numero_ospiti == 2:
         coppia += 3
     if 1 <= numero_notti <= 3:
@@ -94,8 +132,10 @@ def compute_scores(
         coppia += 3
     if any(x in cn for x in ["ota", "booking", "expedia", "leisure"]):
         coppia += 1
+    if numero_bambini is not None and numero_bambini == 0 and numero_ospiti == 2:
+        coppia += 2
 
-    # FAMIGLIA
+    # --- FAMIGLIA ---
     if numero_ospiti >= 3:
         famiglia += 3
     if numero_notti >= 3:
@@ -104,10 +144,18 @@ def compute_scores(
         famiglia += 2
     if is_vacation_period:
         famiglia += 2
+    # Presenza bambini → forte segnale famiglia
+    if numero_bambini is not None and numero_bambini >= 1:
+        famiglia += 4
+    if anticipo_giorni is not None and anticipo_giorni >= 30:
+        famiglia += 1  # prenotazioni family spesso in anticipo
 
-    # PREMIUM
+    # --- PREMIUM ---
     if _is_high_spend(spesa_media, threshold_top25):
         premium += 4
+    # Spesa sopra media (anche se non top 25%)
+    if media_spesa is not None and spesa_media is not None and spesa_media >= media_spesa:
+        premium += 1
     if storico_soggiorni >= 3:
         premium += 3
     if numero_notti >= 4:

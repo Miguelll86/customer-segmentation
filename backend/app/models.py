@@ -52,6 +52,10 @@ class SegmentedCustomer:
     data_arrivo: Optional[str] = None
     categoria_camera: Optional[str] = None
     revenue: Optional[float] = None
+    # Nuovi campi per algoritmo perfezionato
+    anticipo_giorni: Optional[int] = None  # giorni tra prenotazione e arrivo
+    prenotante: Optional[str] = None  # chi ha prenotato (cliente, agenzia, azienda, ecc.)
+    numero_bambini: Optional[int] = None
 
 
 @dataclass

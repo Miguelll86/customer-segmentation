@@ -13,18 +13,28 @@ from app.scoring import compute_scores, assign_segment
 
 
 # Possibili alias per colonne Excel (italiano / inglese). L'ordine delle colonne nel file non conta.
+# Supporto export gestionale: Cliente, data di prenotazione, Arrivo, Partenza, Giorni, Prenotante, totale, Interi, scontati
 COLUMN_ALIASES = {
-    "numero_notti": ["notti", "nights", "numero notti", "n. notti", "notte", "notti soggiorno"],
-    "numero_ospiti": ["ospiti", "guests", "pax", "numero ospiti", "n. ospiti", "adulti"],
+    "numero_notti": ["notti", "nights", "numero notti", "n. notti", "notte", "notti soggiorno", "giorni", "giorni pernottamento", "pernottamento"],
+    "numero_ospiti": ["ospiti", "guests", "pax", "numero ospiti", "n. ospiti", "prenotati"],
     "canale": ["canale", "channel", "canale prenotazione", "source", "distribution"],
     "giorno_arrivo": ["giorno arrivo", "day", "arrival day", "giorno", "weekday", "giorno_arrivo"],
     "storico_soggiorni": ["storico", "storico soggiorni", "previous stays", "stays", "n. soggiorni", "soggiorni precedenti"],
     "spesa_media": ["spesa", "spesa media", "revenue", "adr", "amount", "importo", "spesa_media", "spesa media", "tariffa", "tariff", "rate", "prezzo"],
-    "cliente_id": ["cliente", "id", "customer id", "guest id", "codice cliente", "id cliente"],
-    "nome_cliente": ["nome", "nome cliente", "name", "guest name", "cliente nome", "nominativo"],
-    "data_arrivo": ["data", "data arrivo", "arrival", "arrival date", "check-in", "check in", "data_arrivo", "data arrivo"],
-    "data_partenza": ["data partenza", "departure", "check-out", "check out", "data_partenza"],
+    "totale_soggiorno": ["totale", "totale costo soggiorno", "costo totale", "importo totale", "total", "totale soggiorno"],
+    "cliente_id": ["id", "customer id", "guest id", "codice cliente", "id cliente"],
+    "nome_cliente": ["nome", "nome cliente", "name", "guest name", "cliente nome", "nominativo", "cliente"],
+    "data_arrivo": ["data", "data arrivo", "arrival", "arrival date", "check-in", "check in", "data_arrivo", "data arrivo", "arrivo"],
+    "data_partenza": ["data partenza", "departure", "check-out", "check out", "data_partenza", "partenza"],
     "categoria_camera": ["camera", "room", "room type", "categoria", "tipo camera", "categoria_camera"],
+    # Anticipo prenotazione: giorni tra prenotazione e arrivo (o data prenotazione per calcolo)
+    "anticipo_giorni": ["anticipo", "anticipo giorni", "giorni anticipo", "lead time", "lead_time", "days in advance", "giorni prenotazione"],
+    "data_prenotazione": ["data prenotazione", "data di prenotazione", "booking date", "data booking", "prenotato il", "created", "data creazione"],
+    # Chi ha effettuato la prenotazione (es. agenzia)
+    "prenotante": ["prenotante", "booker", "tipo prenotante", "fonte", "who booked", "tipologia", "tipo cliente", "agenzia della prenotazione", "agenzia"],
+    # Adulti e bambini (export gestionale: Interi = adulti, scontati = bambini)
+    "numero_adulti": ["interi", "nr di adulti", "n. adulti", "numero adulti", "adulti"],
+    "numero_bambini": ["bambini", "numero bambini", "n. bambini", "children", "kids", "bambini soggiorno", "scontati", "nr bambini"],
 }
 
 
@@ -141,6 +151,12 @@ def parse_and_segment(df: pd.DataFrame) -> tuple[list[SegmentedCustomer], float 
                 col_map["spesa_media"] = c
             elif i == 8:
                 col_map["categoria_camera"] = c
+            elif i == 9:
+                col_map["anticipo_giorni"] = c
+            elif i == 10:
+                col_map["prenotante"] = c
+            elif i == 11:
+                col_map["numero_bambini"] = c
 
     def get(row: pd.Series, key: str, default: Any = None):
         col = col_map.get(key)
@@ -151,14 +167,26 @@ def parse_and_segment(df: pd.DataFrame) -> tuple[list[SegmentedCustomer], float 
             return default
         return v
 
-    # Soglia top 25% su spesa_media/tariffa
+    # Soglia top 25% e media spesa (per capacità sopra/sotto media)
+    # Se il file ha "totale" (costo soggiorno) ma non "spesa media", la calcoliamo come totale/giorni
     threshold_top25 = None
+    media_spesa = None
     try:
         spesa_col = col_map.get("spesa_media")
+        totale_col = col_map.get("totale_soggiorno")
+        notti_col = col_map.get("numero_notti")
         if spesa_col and spesa_col in df.columns:
             series = pd.to_numeric(df[spesa_col], errors="coerce").dropna()
             if not series.empty:
                 threshold_top25 = float(series.quantile(0.75))
+                media_spesa = float(series.mean())
+        elif totale_col and totale_col in df.columns and notti_col and notti_col in df.columns:
+            totali = pd.to_numeric(df[totale_col], errors="coerce")
+            notti_ser = pd.to_numeric(df[notti_col], errors="coerce").replace(0, float("nan"))
+            series = (totali / notti_ser).dropna()
+            if not series.empty:
+                threshold_top25 = float(series.quantile(0.75))
+                media_spesa = float(series.mean())
     except Exception:
         pass
 
@@ -171,12 +199,41 @@ def parse_and_segment(df: pd.DataFrame) -> tuple[list[SegmentedCustomer], float 
                 calc = _nights_from_dates(get(row, "data_arrivo"), get(row, "data_partenza"))
                 if calc is not None:
                     notti = calc
-            ospiti = int(pd.to_numeric(get(row, "numero_ospiti", 0), errors="coerce") or 0)
+            # Ospiti: da colonna unica "numero_ospiti" oppure Interi + scontati (adulti + bambini)
+            adulti_val = get(row, "numero_adulti")
+            bambini_col_val = get(row, "numero_bambini")
+            numero_bambini_from_col: int | None = None  # valorizzato se usiamo Interi/scontati
+            if adulti_val is not None or bambini_col_val is not None:
+                adulti = int(pd.to_numeric(adulti_val, errors="coerce") or 0)
+                bambini_num = 0
+                if bambini_col_val is not None:
+                    s = str(bambini_col_val).strip().lower()
+                    if s in ("sì", "si", "yes", "1", "x", "ok"):
+                        bambini_num = 1
+                    elif s not in ("no", "0", ""):
+                        try:
+                            bambini_num = int(pd.to_numeric(bambini_col_val, errors="coerce") or 0)
+                        except (TypeError, ValueError):
+                            pass
+                numero_bambini_from_col = bambini_num
+                ospiti = adulti + bambini_num
+            else:
+                ospiti = int(pd.to_numeric(get(row, "numero_ospiti", 0), errors="coerce") or 0)
             canale = str(get(row, "canale", "") or "")
+            # Se il file ha solo "Prenotante" (agenzia) e non "canale", usalo come canale per la dashboard
+            if not canale:
+                prenotante_raw = get(row, "prenotante")
+                if prenotante_raw is not None:
+                    canale = str(prenotante_raw).strip()
             giorno_raw = get(row, "giorno_arrivo") or get(row, "data_arrivo")
             giorno = _get_day_name(giorno_raw)
             storico = int(pd.to_numeric(get(row, "storico_soggiorni", 0), errors="coerce") or 0)
             spesa = _norm_float(get(row, "spesa_media"))
+            # Se c'è "totale" (costo soggiorno) e non abbiamo spesa per notte, ricavala: totale / giorni
+            if spesa is None and notti > 0:
+                totale_val = _norm_float(get(row, "totale_soggiorno"))
+                if totale_val is not None and totale_val > 0:
+                    spesa = round(totale_val / notti, 2)
             cat_camera = str(get(row, "categoria_camera", "") or "")
             data_arrivo_raw = get(row, "data_arrivo")
             data_arrivo = None
@@ -184,6 +241,37 @@ def parse_and_segment(df: pd.DataFrame) -> tuple[list[SegmentedCustomer], float 
                 dt = _parse_date(data_arrivo_raw)
                 data_arrivo = dt.strftime("%Y-%m-%d") if dt else str(data_arrivo_raw).strip()[:10] or None
             is_vacation = _is_vacation_period(data_arrivo_raw)
+
+            # Anticipo: da colonna "anticipo_giorni" o da (data_arrivo - data_prenotazione)
+            anticipo_giorni = None
+            anticipo_val = get(row, "anticipo_giorni")
+            if anticipo_val is not None:
+                try:
+                    anticipo_giorni = int(pd.to_numeric(anticipo_val, errors="coerce") or 0)
+                except (TypeError, ValueError):
+                    pass
+            if anticipo_giorni is None:
+                dt_arr = _parse_date(get(row, "data_arrivo"))
+                dt_pren = _parse_date(get(row, "data_prenotazione"))
+                if dt_arr and dt_pren and dt_pren <= dt_arr:
+                    anticipo_giorni = (dt_arr - dt_pren).days
+
+            prenotante = str(get(row, "prenotante", "") or "").strip() or None
+
+            numero_bambini = numero_bambini_from_col if numero_bambini_from_col is not None else None
+            if numero_bambini is None:
+                bambini_val = get(row, "numero_bambini")
+                if bambini_val is not None:
+                    s = str(bambini_val).strip().lower()
+                    if s in ("sì", "si", "yes", "1", "x", "ok"):
+                        numero_bambini = 1
+                    elif s in ("no", "0", ""):
+                        numero_bambini = 0
+                    else:
+                        try:
+                            numero_bambini = int(pd.to_numeric(bambini_val, errors="coerce") or 0)
+                        except (TypeError, ValueError):
+                            pass
 
             if notti <= 0:
                 notti = 1
@@ -200,6 +288,10 @@ def parse_and_segment(df: pd.DataFrame) -> tuple[list[SegmentedCustomer], float 
                 categoria_camera=cat_camera,
                 threshold_top25=threshold_top25,
                 is_vacation_period=is_vacation,
+                media_spesa=media_spesa,
+                anticipo_giorni=anticipo_giorni,
+                prenotante=prenotante,
+                numero_bambini=numero_bambini,
             )
             segment = assign_segment(scores)
             revenue = (spesa * notti) if spesa is not None else None
@@ -214,11 +306,14 @@ def parse_and_segment(df: pd.DataFrame) -> tuple[list[SegmentedCustomer], float 
                     giorno_arrivo=giorno or None,
                     storico_soggiorni=storico,
                     spesa_media=spesa,
-                cliente_id=str(get(row, "cliente_id", "")) or None,
-                nome_cliente=str(get(row, "nome_cliente", "")).strip() or None,
-                data_arrivo=data_arrivo,
+                    cliente_id=str(get(row, "cliente_id", "")) or None,
+                    nome_cliente=str(get(row, "nome_cliente", "")).strip() or None,
+                    data_arrivo=data_arrivo,
                     categoria_camera=cat_camera or None,
                     revenue=revenue,
+                    anticipo_giorni=anticipo_giorni,
+                    prenotante=prenotante,
+                    numero_bambini=numero_bambini,
                 )
             )
         except Exception:

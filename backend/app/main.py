@@ -6,7 +6,7 @@ import csv
 import io
 import uuid
 from collections import defaultdict
-from datetime import date
+from datetime import date, datetime
 from typing import Optional
 
 import pandas as pd
@@ -15,6 +15,7 @@ from flask import Flask, jsonify, request, abort
 from app.campaigns import get_all_campaigns_by_segment
 from app.excel_parser import parse_and_segment
 from app.models import Segment, SegmentedCustomer
+from app.operator_refinement import get_indicatori_definitions, segment_from_operator_input
 
 try:
     from flask_cors import CORS
@@ -23,6 +24,9 @@ except ImportError:
 
 # In-memory store (in produzione usare PostgreSQL)
 _store: dict[str, list[SegmentedCustomer]] = {}
+# Feedback operatore per segmento: analysis_id -> row_index -> { segment?, ...campi_manuali, updated_at }
+# Usato per apprendere e aggiornare lo scoring (modello statistico / aggiustamento pesi)
+_operator_feedback: dict[str, dict[int, dict]] = {}
 
 app = Flask(__name__)
 if CORS is not None:
@@ -163,22 +167,33 @@ def get_customers(analysis_id: str):
             "data_arrivo": c.data_arrivo,
             "categoria_camera": c.categoria_camera,
             "revenue": c.revenue,
+            "anticipo_giorni": c.anticipo_giorni,
+            "prenotante": c.prenotante,
+            "numero_bambini": c.numero_bambini,
         })
     return jsonify(out)
 
 
 @app.route("/api/analysis/<analysis_id>/customer/<int:row_index>", methods=["GET"])
 def get_customer(analysis_id: str, row_index: int):
-    """Dettaglio singolo cliente per scheda (percentuali segmenti derivabili da scores)."""
+    """Dettaglio singolo cliente per scheda (percentuali segmenti). Include feedback operatore se presente."""
     customers = _store.get(analysis_id)
     if not customers:
         abort(404, "Analisi non trovata")
     found = next((c for c in customers if c.row_index == row_index), None)
     if not found:
         abort(404, "Cliente non trovato")
-    return jsonify({
+    feedback = (_operator_feedback.get(analysis_id) or {}).get(row_index)
+    segment_display = found.segment.value
+    if feedback and feedback.get("segment"):
+        try:
+            Segment(feedback["segment"])  # valida
+            segment_display = feedback["segment"]
+        except ValueError:
+            pass
+    out = {
         "row_index": found.row_index,
-        "segment": found.segment.value,
+        "segment": segment_display,
         "scores": found.scores.to_dict(),
         "numero_notti": found.numero_notti,
         "numero_ospiti": found.numero_ospiti,
@@ -191,6 +206,77 @@ def get_customer(analysis_id: str, row_index: int):
         "data_arrivo": found.data_arrivo,
         "categoria_camera": found.categoria_camera,
         "revenue": found.revenue,
+        "anticipo_giorni": found.anticipo_giorni,
+        "prenotante": found.prenotante,
+        "numero_bambini": found.numero_bambini,
+        "operator_feedback": feedback,
+    }
+    return jsonify(out)
+
+
+@app.route("/api/analysis/<analysis_id>/customer/<int:row_index>/feedback", methods=["POST"])
+def save_operator_feedback(analysis_id: str, row_index: int):
+    """
+    Salva input operatore: note, richieste speciali, servizi, indicatori comportamentali.
+    Se sono presenti indicatori o testo (note/richieste), il segmento viene ricalcolato con le
+    regole di priorità (Business > Famiglie > Premium > Coppie > Leisure). Segmento esplicito fa override.
+    Body: { "segment"?, "note_prenotazione"?, "richieste_speciali"?, "servizi_selezionati"?, "indicatori"?: [] }
+    """
+    customers = _store.get(analysis_id)
+    if not customers:
+        abort(404, "Analisi non trovata")
+    found = next((c for c in customers if c.row_index == row_index), None)
+    if not found:
+        abort(404, "Cliente non trovato")
+    data = request.get_json(silent=True) or {}
+    segment_explicit = data.get("segment")
+    if segment_explicit is not None:
+        try:
+            Segment(segment_explicit)
+        except ValueError:
+            abort(400, f"Segmento non valido: {segment_explicit}. Usa: Business, Leisure, Coppia, Famiglia, Premium.")
+
+    note_prenotazione = (data.get("note_prenotazione") or "").strip() or None
+    richieste_speciali = (data.get("richieste_speciali") or "").strip() or None
+    servizi_selezionati = data.get("servizi_selezionati")
+    if servizi_selezionati is not None and not isinstance(servizi_selezionati, list):
+        servizi_selezionati = [servizi_selezionati]
+    indicatori = data.get("indicatori")
+    if indicatori is not None and not isinstance(indicatori, list):
+        indicatori = [indicatori] if indicatori else []
+
+    segment_computed = None
+    if indicatori or note_prenotazione or richieste_speciali or servizi_selezionati:
+        segment_computed = segment_from_operator_input(
+            indicatori=indicatori or None,
+            note_prenotazione=note_prenotazione,
+            richieste_speciali=richieste_speciali,
+            servizi_selezionati=servizi_selezionati,
+        ).value
+
+    segment_final = segment_explicit if segment_explicit is not None else segment_computed
+    if segment_final is None and analysis_id in _operator_feedback and row_index in _operator_feedback[analysis_id]:
+        segment_final = _operator_feedback[analysis_id][row_index].get("segment")
+
+    if analysis_id not in _operator_feedback:
+        _operator_feedback[analysis_id] = {}
+    note_operatore = (data.get("note") or "").strip() or None
+    payload = {
+        "note_prenotazione": note_prenotazione,
+        "richieste_speciali": richieste_speciali,
+        "servizi_selezionati": servizi_selezionati,
+        "indicatori": indicatori,
+        "note": note_operatore,
+        "segment_computed": segment_computed,
+        "segment": segment_final,
+        "updated_at": datetime.utcnow().isoformat() + "Z",
+    }
+    _operator_feedback[analysis_id][row_index] = payload
+    return jsonify({
+        "ok": True,
+        "message": "Input operatore salvato. Segmento aggiornato in base a note, richieste e indicatori." if segment_final else "Input salvato.",
+        "feedback": payload,
+        "segment": segment_final,
     })
 
 
@@ -222,6 +308,9 @@ def refresh_customer_profile(analysis_id: str, row_index: int):
             "data_arrivo": found.data_arrivo,
             "categoria_camera": found.categoria_camera,
             "revenue": found.revenue,
+            "anticipo_giorni": found.anticipo_giorni,
+            "prenotante": found.prenotante,
+            "numero_bambini": found.numero_bambini,
         },
     })
 
@@ -306,6 +395,12 @@ def list_segments():
 @app.route("/api/health")
 def health():
     return jsonify({"status": "ok"})
+
+
+@app.route("/api/operator-indicators")
+def list_operator_indicators():
+    """Elenco indicatori comportamentali per la scheda (note, richieste, servizi → segmento)."""
+    return jsonify({"indicatori": get_indicatori_definitions()})
 
 
 # Gestione errori HTTP per restituire JSON
