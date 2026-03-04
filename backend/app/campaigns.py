@@ -17,6 +17,10 @@ DEFAULT_CAMPAIGNS: dict[Segment, list[dict]] = {
         {"titolo": "Upgrade a camera vista mare", "descrizione": "Proponi il passaggio a Deluxe/Superior con vista mare: differenza di prezzo chiara, valore percepito alto. Ideale per soggiorni di 2+ notti.", "tipo": "upgrade"},
         {"titolo": "Tour o escursione in aggiunta", "descrizione": "Vendi tour guidati (Polignano, Alberobello, grotte, Salento) o gite in barca come extra. Pacchetto soggiorno + esperienza a prezzo conveniente rispetto al prezzo separato.", "tipo": "upsell"},
         {"titolo": "Mezza pensione o cena in ristorante", "descrizione": "Aggiungi colazione plus cena (mezza pensione) o almeno una cena in ristorante cucina pugliese. Upsell a tavola con margine sul ristorante.", "tipo": "pacchetto"},
+        {"titolo": "Suite o Deluxe con servizi inclusi", "descrizione": "Proponi la categoria superiore (Suite/Deluxe) con minibar gratuito e vista mare come pacchetto premium. Prezzo ben posizionato per massimizzare l'ADR.", "tipo": "upgrade"},
+        {"titolo": "Pacchetto wellness + cucina pugliese", "descrizione": "Vendi accesso Barion Wellness + cena degustazione in ristorante come pacchetto benessere e gusto. Alto valore percepito, forte margine.", "tipo": "pacchetto"},
+        {"titolo": "Transfer e esperienze su misura", "descrizione": "Offri transfer dedicati (aeroporto, tour) e esperienze esclusive (Venture Vibes, Pugliamare) a prezzo premium. Servizi a valore aggiunto ad alto margine.", "tipo": "upsell"},
+        {"titolo": "Late checkout e servizi concierge", "descrizione": "Monetizza late checkout e servizi su richiesta (prenotazioni ristoranti, transfer): pacchetto concierge o singoli supplementi. Revenue da servizi.", "tipo": "servizio"},
         {"titolo": "Lido convenzionato: pass giornaliero", "descrizione": "Vendi l’accesso a lidi convenzionati (Mama Luna Beach ecc.) come add-on: pass giornaliero o pacchetto multi-giorno. Revenue extra e guest più soddisfatto.", "tipo": "upsell"},
     ],
     Segment.COPPIA: [
@@ -30,12 +34,6 @@ DEFAULT_CAMPAIGNS: dict[Segment, list[dict]] = {
         {"titolo": "Mezza pensione famiglia", "descrizione": "Vendi colazione + cena per tutta la famiglia (mezza pensione). Prezzo per adulto e bambino; margine sul ristorante e soddisfazione per i genitori.", "tipo": "pacchetto"},
         {"titolo": "Escursione o tour per la famiglia", "descrizione": "Vendi come extra tour a grotte, trulli o lido family: pacchetto “giornata in famiglia” a prezzo unico. Aumenta il valore del soggiorno e il revenue.", "tipo": "upsell"},
         {"titolo": "Culla, letto aggiunto, colazione bambini", "descrizione": "Monetizza i servizi family: culla/letto aggiunto a prezzo chiaro; colazione bambini inclusa nel pacchetto. Upsell su ogni componente del soggiorno.", "tipo": "upsell"},
-    ],
-    Segment.PREMIUM: [
-        {"titolo": "Suite o Deluxe con servizi inclusi", "descrizione": "Proponi la categoria superiore (Suite/Deluxe) con minibar gratuito e vista mare come pacchetto premium. Prezzo ben posizionato per massimizzare l’ADR.", "tipo": "upgrade"},
-        {"titolo": "Pacchetto wellness + cucina pugliese", "descrizione": "Vendi accesso Barion Wellness + cena degustazione in ristorante come pacchetto “benessere e gusto”. Alto valore percepito, forte margine.", "tipo": "pacchetto"},
-        {"titolo": "Transfer e esperienze su misura", "descrizione": "Offri transfer dedicati (aeroporto, tour) e esperienze esclusive (Venture Vibes, Pugliamare) a prezzo premium. Servizi a valore aggiunto ad alto margine.", "tipo": "upsell"},
-        {"titolo": "Late checkout e servizi concierge", "descrizione": "Monetizza late checkout e servizi su richiesta (prenotazioni ristoranti, transfer): pacchetto “concierge” o singoli supplementi. Revenue da servizi.", "tipo": "servizio"},
     ],
 }
 

@@ -103,8 +103,8 @@ def _effective_revenue(c) -> float:
 
 
 def _scores_with_operator_boost(scores_dict: dict, chosen_segment: str) -> dict:
-    """Dato lo scoring originale e il segmento da feedback operatore, restituisce score con boost per far riflettere le % l'input operatore."""
-    key_map = {"Business": "business", "Leisure": "leisure", "Coppia": "coppia", "Famiglia": "famiglia", "Premium": "premium"}
+    """Dato lo scoring originale e il segmento da feedback operatore, restituisce score con boost per far riflettere le % l'input operatore. Premium (deprecato) → leisure."""
+    key_map = {"Business": "business", "Leisure": "leisure", "Coppia": "coppia", "Famiglia": "famiglia", "Premium": "leisure"}
     key = key_map.get(chosen_segment)
     if not key or key not in scores_dict:
         return scores_dict
@@ -218,10 +218,13 @@ def get_customer(analysis_id: str, row_index: int):
     segment_display = found.segment.value
     scores_out = found.scores.to_dict()
     if feedback and feedback.get("segment"):
+        seg = feedback["segment"]
+        if seg == "Premium":
+            seg = "Leisure"  # retrocompat: Premium fusionato in Leisure
         try:
-            Segment(feedback["segment"])  # valida
-            segment_display = feedback["segment"]
-            scores_out = _scores_with_operator_boost(scores_out, feedback["segment"])
+            Segment(seg)  # valida
+            segment_display = seg
+            scores_out = _scores_with_operator_boost(scores_out, seg)
         except ValueError:
             pass
     out = {

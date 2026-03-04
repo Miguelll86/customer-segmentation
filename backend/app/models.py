@@ -6,15 +6,13 @@ from typing import Optional
 
 class Segment(str, Enum):
     BUSINESS = "Business"
-    LEISURE = "Leisure"
+    LEISURE = "Leisure"  # include ex-Premium (fusionato)
     COPPIA = "Coppia"
     FAMIGLIA = "Famiglia"
-    PREMIUM = "Premium"
 
 
-# Priorità per parità: Premium > Business > Famiglia > Coppia > Leisure
+# Priorità per parità: Business > Famiglia > Coppia > Leisure
 SEGMENT_PRIORITY = [
-    Segment.PREMIUM,
     Segment.BUSINESS,
     Segment.FAMIGLIA,
     Segment.COPPIA,
@@ -24,12 +22,11 @@ SEGMENT_PRIORITY = [
 
 @dataclass
 class Scores:
-    """Punteggi per ogni segmento."""
+    """Punteggi per ogni segmento (Leisure include ex-Premium)."""
     business: int = 0
     leisure: int = 0
     coppia: int = 0
     famiglia: int = 0
-    premium: int = 0
 
     def to_dict(self) -> dict:
         return asdict(self)

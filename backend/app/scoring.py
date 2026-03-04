@@ -1,6 +1,6 @@
 """
 Algoritmo di scoring ponderato per segmentazione clienti.
-Una sola categoria primaria per cliente; in parità: Premium > Business > Famiglia > Coppia > Leisure.
+Una sola categoria primaria per cliente; in parità: Business > Famiglia > Coppia > Leisure (Leisure include ex-Premium).
 """
 from typing import Any
 
@@ -67,7 +67,7 @@ def compute_scores(
     gn = _norm(giorno_arrivo)
     is_weekend = gn in {"ven", "sab", "dom", "venerdì", "sabato", "domenica", "friday", "saturday", "sunday"}
     is_midweek = gn in GIORNI_MIDWEEK
-    business = leisure = coppia = famiglia = premium = 0
+    business = leisure = coppia = famiglia = 0
 
     # --- Combinazioni giorno arrivo + numero notti ---
     if is_weekend and numero_notti == 1:
@@ -150,27 +150,25 @@ def compute_scores(
     if anticipo_giorni is not None and anticipo_giorni >= 30:
         famiglia += 1  # prenotazioni family spesso in anticipo
 
-    # --- PREMIUM ---
+    # --- LEISURE (include ex-Premium: alta spesa, categoria camera, direct) ---
     if _is_high_spend(spesa_media, threshold_top25):
-        premium += 4
-    # Spesa sopra media (anche se non top 25%)
+        leisure += 4
     if media_spesa is not None and spesa_media is not None and spesa_media >= media_spesa:
-        premium += 1
+        leisure += 1
     if storico_soggiorni >= 3:
-        premium += 3
+        leisure += 3
     if numero_notti >= 4:
-        premium += 2
+        leisure += 2
     if cn in CANALI_DIRETTO or "direct" in cn or "diretto" in cn:
-        premium += 2
+        leisure += 2
     if _is_high_room_category(categoria_camera):
-        premium += 2
+        leisure += 2
 
     return Scores(
         business=business,
         leisure=leisure,
         coppia=coppia,
         famiglia=famiglia,
-        premium=premium,
     )
 
 
@@ -179,7 +177,6 @@ KEY_TO_SEGMENT = {
     "leisure": Segment.LEISURE,
     "coppia": Segment.COPPIA,
     "famiglia": Segment.FAMIGLIA,
-    "premium": Segment.PREMIUM,
 }
 
 

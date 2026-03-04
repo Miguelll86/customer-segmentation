@@ -104,7 +104,7 @@ export default function HomePage() {
             </div>
             <div>
               <p className="text-sm text-[var(--muted)]">Segmenti</p>
-              <p className="font-medium">Business, Leisure, Coppia, Famiglia, Premium</p>
+              <p className="font-medium">Business, Leisure, Coppia, Famiglia</p>
             </div>
           </div>
           <div className="card flex items-center gap-4">

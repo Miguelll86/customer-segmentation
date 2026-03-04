@@ -3,9 +3,8 @@ Raffinamento segmento da input operatore: note di prenotazione, richieste specia
 Regole di priorità in caso di sovrapposizione:
   Motivazione aziendale → Business prevale.
   Minori presenti → Famiglie prevale.
-  Suite + servizi esclusivi → Premium prevale.
   Esperienza romantica dichiarata → Coppie prevale.
-  Assenza indicatori specifici → Leisure default.
+  Assenza indicatori specifici → Leisure (include ex-Premium) default.
 """
 from app.models import Segment
 
@@ -33,14 +32,7 @@ INDICATORI_COPPIA = {
     "cena_romantica",
     "late_checkout_weekend",
 }
-INDICATORI_PREMIUM = {
-    "suite_executive",
-    "servizi_personalizzati",
-    "transfer_privato",
-    "spa_esclusiva",
-    "upgrade_volontario",
-    "spesa_accessoria_elevata",
-}
+# Leisure include ex-Premium (fusionati)
 INDICATORI_LEISURE = {
     "attrazioni_turistiche",
     "parcheggio",
@@ -48,13 +40,18 @@ INDICATORI_LEISURE = {
     "tariffa_flessibile",
     "colazione_inclusa",
     "pet_friendly",
+    "suite_executive",
+    "servizi_personalizzati",
+    "transfer_privato",
+    "spa_esclusiva",
+    "upgrade_volontario",
+    "spesa_accessoria_elevata",
 }
 
 # Ordine di priorità per sovrapposizione (primo che matcha vince)
 PRIORITA_INDICATORI = [
     (INDICATORI_BUSINESS, Segment.BUSINESS),
     (INDICATORI_FAMIGLIA, Segment.FAMIGLIA),
-    (INDICATORI_PREMIUM, Segment.PREMIUM),
     (INDICATORI_COPPIA, Segment.COPPIA),
     (INDICATORI_LEISURE, Segment.LEISURE),
 ]
@@ -162,7 +159,7 @@ def segment_from_operator_input(
 ) -> Segment:
     """
     Determina il segmento in base a indicatori, servizi, note e richieste.
-    Applica le regole di priorità: Business > Famiglie > Premium > Coppie > Leisure (default).
+    Applica le regole di priorità: Business > Famiglie > Coppie > Leisure (default).
     """
     indicatori_set: set[str] = set()
     if indicatori:
@@ -189,9 +186,7 @@ def get_indicatori_definitions() -> list[dict]:
     ] + [
         {"key": k, "segment": "Coppia", "label": _label_coppia(k)} for k in sorted(INDICATORI_COPPIA)
     ] + [
-        {"key": k, "segment": "Premium", "label": _label_premium(k)} for k in sorted(INDICATORI_PREMIUM)
-    ] + [
-        {"key": k, "segment": "Leisure", "label": _label_leisure(k)} for k in sorted(INDICATORI_LEISURE)
+        {"key": k, "segment": "Leisure", "label": _label_leisure_or_premium(k)} for k in sorted(INDICATORI_LEISURE)
     ]
 
 
@@ -251,3 +246,11 @@ def _label_leisure(k: str) -> str:
         "pet_friendly": "Cane / camera pet friendly",
     }
     return labels.get(k, k.replace("_", " ").title())
+
+
+def _label_leisure_or_premium(k: str) -> str:
+    """Etichetta per indicatori Leisure (include ex-Premium)."""
+    return _label_premium(k) if k in {
+        "suite_executive", "servizi_personalizzati", "transfer_privato",
+        "spa_esclusiva", "upgrade_volontario", "spesa_accessoria_elevata"
+    } else _label_leisure(k)

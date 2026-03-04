@@ -25,7 +25,7 @@ const SEGMENT_COLORS: Record<string, string> = {
   Leisure: '#22c55e',
   Coppia: '#ec4899',
   Famiglia: '#f59e0b',
-  Premium: '#8b5cf6',
+  Premium: '#22c55e', // retrocompat: ex-Premium fusionato in Leisure
 };
 
 type Overview = {
@@ -90,14 +90,13 @@ const SEGMENT_LABELS: Record<string, string> = {
   leisure: 'Leisure',
   coppia: 'Coppia',
   famiglia: 'Famiglia',
-  premium: 'Premium',
 };
 
 function scoresToPercentages(scores: Record<string, number>): { segment: string; percent: number }[] {
-  const keys = ['business', 'leisure', 'coppia', 'famiglia', 'premium'];
+  const keys = ['business', 'leisure', 'coppia', 'famiglia'];
   const total = keys.reduce((s, k) => s + (scores[k] ?? 0), 0);
   if (total === 0) {
-    return keys.map((k) => ({ segment: SEGMENT_LABELS[k] ?? k, percent: 20 }));
+    return keys.map((k) => ({ segment: SEGMENT_LABELS[k] ?? k, percent: 25 }));
   }
   return keys.map((k) => ({
     segment: SEGMENT_LABELS[k] ?? k,
@@ -392,7 +391,7 @@ export default function DashboardPage() {
                                                       <td className="p-3">{c.prenotante ?? '-'}</td>
                                                       <td className="p-3">{c.numero_bambini != null ? c.numero_bambini : '-'}</td>
                                                       <td className="p-3 font-mono text-xs">
-                                                        {c.scores?.business ?? 0}/{c.scores?.leisure ?? 0}/{c.scores?.coppia ?? 0}/{c.scores?.famiglia ?? 0}/{c.scores?.premium ?? 0}
+                                                        {c.scores?.business ?? 0}/{c.scores?.leisure ?? 0}/{c.scores?.coppia ?? 0}/{c.scores?.famiglia ?? 0}
                                                       </td>
                                                     </tr>
                   ))}
@@ -473,6 +472,50 @@ export default function DashboardPage() {
                       ));
                     })()}
                   </div>
+
+                  {/* Market Intelligence: 5 campagne – 3 dalla % più alta, 2 dalla seconda */}
+                  {marketing && (() => {
+                    const percentages = scoresToPercentages(displayCustomer.scores || {});
+                    const topTwo = [...percentages].sort((a, b) => b.percent - a.percent).slice(0, 2);
+                    const segNames = topTwo.map((p) => p.segment);
+                    const campaignsBySeg = new Map(marketing.segmenti.map((s) => [s.segment, s.campagne || []]));
+                    const picked: Array<{ titolo: string; descrizione: string; tipo: string; segment: string }> = [];
+                    const takeFirst = 3;
+                    const takeSecond = 2;
+                    if (segNames[0]) {
+                      const list = campaignsBySeg.get(segNames[0]) || [];
+                      for (let i = 0; i < takeFirst && list[i]; i++) {
+                        picked.push({ ...list[i], segment: segNames[0] } as { titolo: string; descrizione: string; tipo: string; segment: string });
+                      }
+                    }
+                    if (segNames[1]) {
+                      const list = campaignsBySeg.get(segNames[1]) || [];
+                      for (let i = 0; i < takeSecond && list[i]; i++) {
+                        picked.push({ ...list[i], segment: segNames[1] } as { titolo: string; descrizione: string; tipo: string; segment: string });
+                      }
+                    }
+                    const toShow = picked.slice(0, 5);
+                    if (toShow.length === 0) return null;
+                    return (
+                      <div className="mt-2 space-y-2">
+                        <p className="text-xs font-medium text-[var(--text)]">Market Intelligence</p>
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                          {toShow.map((camp, idx) => (
+                            <div
+                              key={`${camp.segment}-${camp.titolo}-${idx}`}
+                              className="rounded-lg border border-[var(--border)] bg-[var(--bg)]/60 p-2"
+                              style={{ borderLeftWidth: '3px', borderLeftColor: SEGMENT_COLORS[camp.segment] || '#64748b' }}
+                            >
+                              <p className="text-xs font-medium text-[var(--text)] line-clamp-1">{camp.titolo}</p>
+                              <p className="mt-0.5 text-[10px] text-[var(--muted)] line-clamp-2">{camp.descrizione}</p>
+                              <span className="mt-1 inline-block rounded px-1.5 py-0.5 text-[10px] text-[var(--muted)] ring-1 ring-[var(--border)]">{camp.tipo}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   {profileUpdated ? (
                     <p className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300">
                       Profilo aggiornato. Elaborato con i dati attuali del soggiorno.
@@ -509,8 +552,7 @@ export default function DashboardPage() {
                     <p><strong style={{ color: SEGMENT_COLORS['Business'] }}>Business:</strong> lavoro, fattura aziendale, meeting, scrivania, check-in rapido</p>
                     <p><strong style={{ color: SEGMENT_COLORS['Famiglia'] }}>Famiglia:</strong> bambini, culla, camera tripla/quadrupla</p>
                     <p><strong style={{ color: SEGMENT_COLORS['Coppia'] }}>Coppia:</strong> anniversario, romantico, cena romantica, spa coppia, late check-out</p>
-                    <p><strong style={{ color: SEGMENT_COLORS['Premium'] }}>Premium:</strong> suite, executive, transfer privato, upgrade</p>
-                    <p><strong style={{ color: SEGMENT_COLORS['Leisure'] }}>Leisure:</strong> attrazioni, parcheggio, pet friendly, cane</p>
+                    <p><strong style={{ color: SEGMENT_COLORS['Leisure'] }}>Leisure:</strong> attrazioni, parcheggio, pet friendly, cane, suite, executive, transfer, upgrade</p>
                   </div>
 
                   <div className="grid gap-2 sm:grid-cols-2">
@@ -553,7 +595,7 @@ export default function DashboardPage() {
                   <div>
                     <span className="mb-2 block text-xs text-[var(--muted)]">Indicatori comportamentali</span>
                     <div className="flex flex-wrap gap-x-4 gap-y-2">
-                      {['Business', 'Famiglia', 'Coppia', 'Premium', 'Leisure'].map((seg) => {
+                      {['Business', 'Famiglia', 'Coppia', 'Leisure'].map((seg) => {
                         const items = indicatoriDefinitions.filter((i) => i.segment === seg);
                         if (items.length === 0) return null;
                         return (
@@ -619,39 +661,6 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Marketing Intelligence */}
-        {marketing && (
-          <section className="mb-8">
-            <h2 className="mb-4 text-lg font-medium">Marketing Intelligence</h2>
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {marketing.segmenti.map((seg) => (
-                <div key={seg.segment} className="card">
-                  <h3
-                    className="mb-3 rounded-lg px-3 py-2 text-sm font-medium"
-                    style={{ backgroundColor: `${SEGMENT_COLORS[seg.segment] || '#64748b'}25`, color: SEGMENT_COLORS[seg.segment] }}
-                  >
-                    {seg.segment}
-                  </h3>
-                  <ul className="mb-3 space-y-1 text-xs text-[var(--muted)]">
-                    <li>Revenue attuale: € {seg.revenue_attuale.toLocaleString('it-IT')}</li>
-                    <li>Revenue potenziale: € {seg.revenue_potenziale_stimata.toLocaleString('it-IT')}</li>
-                    <li>Conversion rate: {(seg.conversion_rate_storico * 100).toFixed(1)}%</li>
-                    <li>ROI stimato: {seg.roi_stimato}x</li>
-                  </ul>
-                  <p className="mb-2 text-xs font-medium text-[var(--text)]">Campagne suggerite</p>
-                  <ul className="space-y-2">
-                    {seg.campagne.map((camp) => (
-                      <li key={camp.titolo} className="rounded border border-[var(--border)] p-2 text-xs">
-                        <span className="font-medium text-[var(--text)]">{camp.titolo}</span>
-                        <p className="mt-1 text-[var(--muted)]">{camp.descrizione}</p>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
       </main>
     </div>
   );
