@@ -455,9 +455,9 @@ export default function DashboardPage() {
               <p className="text-sm text-[var(--muted)] mb-4">
                 Segmento: <strong className="text-[var(--text)]" style={{ color: SEGMENT_COLORS[displayCustomer.segment] }}>{displayCustomer.segment}</strong>
                 {displayCustomer.data_arrivo && <> · Arrivo {displayCustomer.data_arrivo}</>}
-                {displayCustomer.operator_feedback?.updated_at && (
+                {displayCustomer.operator_feedback && displayCustomer.operator_feedback.updated_at != null ? (
                   <span className="ml-2 text-xs text-emerald-400">(aggiornato da operatore)</span>
-                )}
+                ) : null}
               </p>
               <p className="text-sm font-medium text-[var(--text)] mb-2">Prime due categorie (scoring %)</p>
               <ul className="space-y-2 mb-6">
