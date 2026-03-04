@@ -20,8 +20,8 @@ COLUMN_ALIASES = {
     "canale": ["canale", "channel", "canale prenotazione", "source", "distribution"],
     "giorno_arrivo": ["giorno arrivo", "day", "arrival day", "giorno", "weekday", "giorno_arrivo"],
     "storico_soggiorni": ["storico", "storico soggiorni", "previous stays", "stays", "n. soggiorni", "soggiorni precedenti"],
-    "spesa_media": ["spesa", "spesa media", "revenue", "adr", "amount", "importo", "spesa_media", "spesa media", "tariffa", "tariff", "rate", "prezzo"],
-    "totale_soggiorno": ["totale", "totale costo soggiorno", "costo totale", "importo totale", "total", "totale soggiorno"],
+    "spesa_media": ["spesa", "spesa media", "adr", "amount", "importo", "spesa_media", "spesa media", "tariffa", "tariff", "rate", "prezzo"],
+    "totale_soggiorno": ["totale", "revenue", "totale costo soggiorno", "totale (totale costo soggiorno)", "costo totale", "importo totale", "total", "totale soggiorno"],
     "cliente_id": ["id", "customer id", "guest id", "codice cliente", "id cliente"],
     "nome_cliente": ["nome", "nome cliente", "name", "guest name", "cliente nome", "nominativo", "cliente"],
     "data_arrivo": ["data", "data arrivo", "arrival", "arrival date", "check-in", "check in", "data_arrivo", "data arrivo", "arrivo"],
@@ -342,10 +342,9 @@ def _norm_float(v: Any) -> float | None:
     except (ValueError, TypeError):
         pass
     s = str(v).strip().replace(" ", "").replace("\u00a0", "")
-    if "," in s and "." in s:
-        # Mantieni solo la virgola come decimale
-        s = s.replace(".", "")
-    s = s.replace(",", ".")
+    # Formato europeo: virgola = decimali, punto = migliaia (es. 1.200,50)
+    if "," in s:
+        s = s.replace(".", "").replace(",", ".")
     try:
         return float(s)
     except (ValueError, TypeError):

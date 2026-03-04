@@ -93,6 +93,24 @@ def upload_excel():
     })
 
 
+def _effective_revenue(c) -> float:
+    """Revenue del cliente: da campo revenue o, se mancante, spesa_media * numero_notti."""
+    if c.revenue is not None and c.revenue > 0:
+        return float(c.revenue)
+    if c.spesa_media is not None and c.numero_notti is not None and c.numero_notti > 0:
+        return c.spesa_media * c.numero_notti
+    return 0.0
+
+
+def _effective_adr(c) -> float:
+    """ADR del cliente: spesa_media o, se mancante, revenue / numero_notti."""
+    if c.spesa_media is not None and c.spesa_media > 0:
+        return float(c.spesa_media)
+    if c.revenue is not None and c.numero_notti is not None and c.numero_notti > 0:
+        return c.revenue / c.numero_notti
+    return 0.0
+
+
 @app.route("/api/analysis/<analysis_id>/overview")
 def get_overview(analysis_id: str):
     """KPI overview: totale arrivi, distribuzione segmenti, ADR, revenue, valore cliente medio."""
@@ -108,10 +126,10 @@ def get_overview(analysis_id: str):
         list_c = by_segment.get(seg, [])
         count = len(list_c)
         pct = (count / total * 100) if total else 0
-        revenues = [c.revenue for c in list_c if c.revenue is not None]
-        spendings = [c.spesa_media for c in list_c if c.spesa_media is not None]
-        adr = sum(spendings) / len(spendings) if spendings else 0
-        rev_tot = sum(revenues) if revenues else 0
+        revenues = [_effective_revenue(c) for c in list_c]
+        adrs = [_effective_adr(c) for c in list_c if _effective_adr(c) > 0]
+        rev_tot = sum(revenues)
+        adr = sum(adrs) / len(adrs) if adrs else 0
         val_medio = (rev_tot / count) if count else 0
         segment_stats.append({
             "segment": seg.value,
@@ -122,7 +140,9 @@ def get_overview(analysis_id: str):
             "valore_cliente_medio": round(val_medio, 2),
         })
     total_revenue = sum(s["revenue_totale"] for s in segment_stats)
-    overall_adr = sum(c.spesa_media or 0 for c in customers) / total if total else 0
+    adr_sum = sum(_effective_adr(c) for c in customers)
+    adr_count = sum(1 for c in customers if _effective_adr(c) > 0)
+    overall_adr = adr_sum / adr_count if adr_count else 0
     return jsonify({
         "total_arrivals": total,
         "total_revenue": round(total_revenue, 2),

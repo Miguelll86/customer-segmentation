@@ -1,36 +1,41 @@
 """
-Generazione automatica campagne marketing per segmento.
-Modificabili da backend (configurabili), tracciabili, collegabili a email/CRM.
+Campagne marketing per segmento – Hotel Barion (Bari, Puglia).
+Basate su servizi reali: area congressi, Barion Wellness, ristorante cucina pugliese,
+vista mare, parcheggio gratuito, tour e lidi convenzionati. Vedi www.barionhotel.it
 """
 from app.models import Segment, CampaignItem
 
-# Campagne predefinite per segmento (modificabili da config/DB in seguito)
+# 4 campagne per segmento – focus upselling: upgrade, extra, pacchetti a valore aggiunto
 DEFAULT_CAMPAIGNS: dict[Segment, list[dict]] = {
     Segment.BUSINESS: [
-        {"titolo": "Pacchetto corporate midweek", "descrizione": "Tariffa riservata per soggiorni Lun-Mer con colazione e Wi-Fi incluso.", "tipo": "pacchetto"},
-        {"titolo": "Sconto ricorrente aziendale", "descrizione": "Sconto del 15% per prenotazioni ripetute con contratto aziendale.", "tipo": "sconto"},
-        {"titolo": "Upgrade veloce", "descrizione": "Upgrade a camera superiore al check-in se disponibile (supplemento ridotto).", "tipo": "upgrade"},
+        {"titolo": "Upgrade a Deluxe con vista mare", "descrizione": "Passa a camera Deluxe o Superior: spazio in più, scrivania, vista mare. Supplemento contenuto; produttività e comfort. Proponi al check-in o in prenotazione.", "tipo": "upgrade"},
+        {"titolo": "Pacchetto meeting: sala + coffee break + pranzo", "descrizione": "Vendi l’intero pacchetto: area congressi + coffee break e pranzo in ristorante. Un’unica soluzione a valore aggiunto invece della sola camera.", "tipo": "pacchetto"},
+        {"titolo": "Transfer aeroporto / stazione", "descrizione": "Offri navetta o transfer su prenotazione (aeroporto Bari, stazione Torre a Mare). Servizio a pagamento che semplifica l’arrivo e genera extra revenue.", "tipo": "servizio"},
+        {"titolo": "Cena in ristorante dopo il meeting", "descrizione": "Upsell serale: cena in ristorante cucina pugliese invece della cena fuori. Menù business o degustazione. Aumenta il revenue per coperto.", "tipo": "upsell"},
     ],
     Segment.LEISURE: [
-        {"titolo": "Offerta stagionale", "descrizione": "Promozione early booking per le prossime stagioni con sconto fino al 20%.", "tipo": "stagionale"},
-        {"titolo": "Esperienze locali", "descrizione": "Pacchetto esperienze (tour, degustazioni) in collaborazione con partner locali.", "tipo": "esperienza"},
-        {"titolo": "Sconto prenotazione anticipata", "descrizione": "Fino al 25% di sconto per prenotazioni con almeno 30 giorni di anticipo.", "tipo": "early_booking"},
+        {"titolo": "Upgrade a camera vista mare", "descrizione": "Proponi il passaggio a Deluxe/Superior con vista mare: differenza di prezzo chiara, valore percepito alto. Ideale per soggiorni di 2+ notti.", "tipo": "upgrade"},
+        {"titolo": "Tour o escursione in aggiunta", "descrizione": "Vendi tour guidati (Polignano, Alberobello, grotte, Salento) o gite in barca come extra. Pacchetto soggiorno + esperienza a prezzo conveniente rispetto al prezzo separato.", "tipo": "upsell"},
+        {"titolo": "Mezza pensione o cena in ristorante", "descrizione": "Aggiungi colazione plus cena (mezza pensione) o almeno una cena in ristorante cucina pugliese. Upsell a tavola con margine sul ristorante.", "tipo": "pacchetto"},
+        {"titolo": "Lido convenzionato: pass giornaliero", "descrizione": "Vendi l’accesso a lidi convenzionati (Mama Luna Beach ecc.) come add-on: pass giornaliero o pacchetto multi-giorno. Revenue extra e guest più soddisfatto.", "tipo": "upsell"},
     ],
     Segment.COPPIA: [
-        {"titolo": "Pacchetto romantico", "descrizione": "Notte romantica con champagne, fiori e late checkout incluso.", "tipo": "pacchetto"},
-        {"titolo": "Cena + Spa", "descrizione": "Dinner per due e accesso spa con sconto dedicato alle coppie.", "tipo": "esperienza"},
-        {"titolo": "Late checkout", "descrizione": "Check-out entro le 16:00 senza supplemento per soggiorni weekend.", "tipo": "servizio"},
+        {"titolo": "Upgrade camera con vista + late checkout", "descrizione": "Pacchetto a pagamento: camera Superior/Deluxe vista mare + late checkout (es. entro le 16). Un unico prezzo per un weekend di qualità in più.", "tipo": "upgrade"},
+        {"titolo": "Cena romantica + Barion Wellness", "descrizione": "Vendi il pacchetto coppia: cena per due in ristorante + accesso area benessere. Prezzo pacchetto vantaggioso rispetto al prezzo separato; forte upsell.", "tipo": "upsell"},
+        {"titolo": "Supplemento minibar / champagne in camera", "descrizione": "Offri bottiglia di champagne o upgrade minibar in camera come sorpresa (anniversario, richiesta). Extra a prezzo premium, facile da proporre al check-in.", "tipo": "upsell"},
+        {"titolo": "Tour o esperienza per due", "descrizione": "Aggiungi un’esperienza: tour borghi, gita in barca, degustazione. Vendila come “esperienza per due” a prezzo coppia; incrementa il ticket medio.", "tipo": "pacchetto"},
     ],
     Segment.FAMIGLIA: [
-        {"titolo": "Bambini gratis", "descrizione": "Soggiorno gratuito per bambini sotto i 12 anni in camera con i genitori.", "tipo": "sconto"},
-        {"titolo": "Pacchetto family", "descrizione": "Family room + colazione bambini + attività kids club incluso.", "tipo": "pacchetto"},
-        {"titolo": "Attività per bambini", "descrizione": "Animazione e laboratori per bambini nei weekend e in alta stagione.", "tipo": "esperienza"},
+        {"titolo": "Upgrade a camera family o collegata", "descrizione": "Proponi camera più grande o due camere collegate a prezzo family. Maggiore comfort e revenue per notte; ideale per 3+ notti.", "tipo": "upgrade"},
+        {"titolo": "Mezza pensione famiglia", "descrizione": "Vendi colazione + cena per tutta la famiglia (mezza pensione). Prezzo per adulto e bambino; margine sul ristorante e soddisfazione per i genitori.", "tipo": "pacchetto"},
+        {"titolo": "Escursione o tour per la famiglia", "descrizione": "Vendi come extra tour a grotte, trulli o lido family: pacchetto “giornata in famiglia” a prezzo unico. Aumenta il valore del soggiorno e il revenue.", "tipo": "upsell"},
+        {"titolo": "Culla, letto aggiunto, colazione bambini", "descrizione": "Monetizza i servizi family: culla/letto aggiunto a prezzo chiaro; colazione bambini inclusa nel pacchetto. Upsell su ogni componente del soggiorno.", "tipo": "upsell"},
     ],
     Segment.PREMIUM: [
-        {"titolo": "Concierge dedicato", "descrizione": "Concierge personale per prenotazioni ristoranti, transfer e esperienze su misura.", "tipo": "servizio"},
-        {"titolo": "Upgrade prioritario", "descrizione": "Upgrade a suite o categoria superiore in base a disponibilità (priorità alta).", "tipo": "upgrade"},
-        {"titolo": "Evento esclusivo", "descrizione": "Inviti a eventi riservati (degustazioni, serate) durante il soggiorno.", "tipo": "evento"},
-        {"titolo": "Esperienza personalizzata", "descrizione": "Itinerari e attività cuciti su misura dal team concierge.", "tipo": "esperienza"},
+        {"titolo": "Suite o Deluxe con servizi inclusi", "descrizione": "Proponi la categoria superiore (Suite/Deluxe) con minibar gratuito e vista mare come pacchetto premium. Prezzo ben posizionato per massimizzare l’ADR.", "tipo": "upgrade"},
+        {"titolo": "Pacchetto wellness + cucina pugliese", "descrizione": "Vendi accesso Barion Wellness + cena degustazione in ristorante come pacchetto “benessere e gusto”. Alto valore percepito, forte margine.", "tipo": "pacchetto"},
+        {"titolo": "Transfer e esperienze su misura", "descrizione": "Offri transfer dedicati (aeroporto, tour) e esperienze esclusive (Venture Vibes, Pugliamare) a prezzo premium. Servizi a valore aggiunto ad alto margine.", "tipo": "upsell"},
+        {"titolo": "Late checkout e servizi concierge", "descrizione": "Monetizza late checkout e servizi su richiesta (prenotazioni ristoranti, transfer): pacchetto “concierge” o singoli supplementi. Revenue da servizi.", "tipo": "servizio"},
     ],
 }
 
