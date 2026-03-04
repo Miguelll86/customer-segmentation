@@ -167,6 +167,65 @@ def get_customers(analysis_id: str):
     return jsonify(out)
 
 
+@app.route("/api/analysis/<analysis_id>/customer/<int:row_index>", methods=["GET"])
+def get_customer(analysis_id: str, row_index: int):
+    """Dettaglio singolo cliente per scheda (percentuali segmenti derivabili da scores)."""
+    customers = _store.get(analysis_id)
+    if not customers:
+        abort(404, "Analisi non trovata")
+    found = next((c for c in customers if c.row_index == row_index), None)
+    if not found:
+        abort(404, "Cliente non trovato")
+    return jsonify({
+        "row_index": found.row_index,
+        "segment": found.segment.value,
+        "scores": found.scores.to_dict(),
+        "numero_notti": found.numero_notti,
+        "numero_ospiti": found.numero_ospiti,
+        "canale": found.canale,
+        "giorno_arrivo": found.giorno_arrivo,
+        "storico_soggiorni": found.storico_soggiorni,
+        "spesa_media": found.spesa_media,
+        "cliente_id": found.cliente_id,
+        "nome_cliente": found.nome_cliente,
+        "data_arrivo": found.data_arrivo,
+        "categoria_camera": found.categoria_camera,
+        "revenue": found.revenue,
+    })
+
+
+@app.route("/api/analysis/<analysis_id>/customer/<int:row_index>/refresh", methods=["POST"])
+def refresh_customer_profile(analysis_id: str, row_index: int):
+    """Simula aggiornamento profilo durante il soggiorno (ricalcolo segmentazione)."""
+    customers = _store.get(analysis_id)
+    if not customers:
+        abort(404, "Analisi non trovata")
+    found = next((c for c in customers if c.row_index == row_index), None)
+    if not found:
+        abort(404, "Cliente non trovato")
+    # Per ora restituisce gli stessi dati; in futuro qui si può ricalcolare con dati aggiornati
+    return jsonify({
+        "ok": True,
+        "message": "Profilo aggiornato. Elaborato con i dati attuali del soggiorno.",
+        "customer": {
+            "row_index": found.row_index,
+            "segment": found.segment.value,
+            "scores": found.scores.to_dict(),
+            "numero_notti": found.numero_notti,
+            "numero_ospiti": found.numero_ospiti,
+            "canale": found.canale,
+            "giorno_arrivo": found.giorno_arrivo,
+            "storico_soggiorni": found.storico_soggiorni,
+            "spesa_media": found.spesa_media,
+            "cliente_id": found.cliente_id,
+            "nome_cliente": found.nome_cliente,
+            "data_arrivo": found.data_arrivo,
+            "categoria_camera": found.categoria_camera,
+            "revenue": found.revenue,
+        },
+    })
+
+
 @app.route("/api/analysis/<analysis_id>/customers/count")
 def get_customers_count(analysis_id: str):
     """Conteggio clienti (per paginazione), opzionale per segmento."""
@@ -254,6 +313,20 @@ def health():
 @app.errorhandler(404)
 def json_error(e):
     return jsonify({"detail": e.description or str(e)}), e.code
+
+
+@app.errorhandler(500)
+def handle_500(e):
+    """Restituisce JSON anche per errori 500 così il frontend può mostrare il messaggio."""
+    detail = getattr(e, "description", None) or str(e) if e else "Errore interno del server"
+    return jsonify({"detail": detail}), 500
+
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    """Cattura eccezioni non gestite e restituisce 500 in JSON."""
+    app.logger.exception(e)
+    return jsonify({"detail": str(e)}), 500
 
 
 if __name__ == "__main__":

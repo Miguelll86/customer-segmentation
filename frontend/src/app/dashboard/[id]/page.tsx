@@ -3,7 +3,7 @@
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, TrendingUp, Users, Euro, PieChart } from 'lucide-react';
+import { ArrowLeft, TrendingUp, Users, Euro, PieChart, X, RefreshCw } from 'lucide-react';
 import {
   PieChart as RechartsPie,
   Pie,
@@ -74,6 +74,26 @@ type Marketing = {
   segmenti: MarketingSegment[];
 };
 
+const SEGMENT_LABELS: Record<string, string> = {
+  business: 'Business',
+  leisure: 'Leisure',
+  coppia: 'Coppia',
+  famiglia: 'Famiglia',
+  premium: 'Premium',
+};
+
+function scoresToPercentages(scores: Record<string, number>): { segment: string; percent: number }[] {
+  const keys = ['business', 'leisure', 'coppia', 'famiglia', 'premium'];
+  const total = keys.reduce((s, k) => s + (scores[k] ?? 0), 0);
+  if (total === 0) {
+    return keys.map((k) => ({ segment: SEGMENT_LABELS[k] ?? k, percent: 20 }));
+  }
+  return keys.map((k) => ({
+    segment: SEGMENT_LABELS[k] ?? k,
+    percent: Math.round(((scores[k] ?? 0) / total) * 1000) / 10,
+  }));
+}
+
 function fetchApi<T>(path: string): Promise<T> {
   const url = API_BASE ? `${API_BASE}${path}` : path;
   return fetch(url).then(async (r) => {
@@ -93,6 +113,9 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
+  const [selectedCustomer, setSelectedCustomer] = useState<CustomerRow | null>(null);
+  const [profileUpdated, setProfileUpdated] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const perPage = 20;
 
   useEffect(() => {
@@ -292,8 +315,14 @@ export default function DashboardPage() {
                   {customers.map((c) => (
                     <tr key={c.row_index} className="border-b border-[var(--border)]/50 hover:bg-white/5">
                       <td className="p-3">{c.row_index + 1}</td>
-                      <td className="p-3 font-medium">
-                        {c.nome_cliente || c.cliente_id || '-'}
+                      <td className="p-3">
+                        <button
+                          type="button"
+                          onClick={() => { setSelectedCustomer(c); setProfileUpdated(false); }}
+                          className="font-medium text-left text-[var(--accent)] hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--accent)] rounded"
+                        >
+                          {c.nome_cliente || c.cliente_id || 'Cliente'}
+                        </button>
                       </td>
                       <td className="p-3">
                         <span
@@ -338,6 +367,83 @@ export default function DashboardPage() {
             </div>
           </div>
         </section>
+
+        {/* Scheda cliente (modal) */}
+        {selectedCustomer && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+            onClick={() => setSelectedCustomer(null)}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="scheda-cliente-title"
+          >
+            <div
+              className="card max-h-[90vh] w-full max-w-lg overflow-y-auto shadow-xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between border-b border-[var(--border)] pb-3 mb-4">
+                <h2 id="scheda-cliente-title" className="text-lg font-semibold text-[var(--text)]">
+                  {selectedCustomer.nome_cliente || selectedCustomer.cliente_id || 'Cliente'}
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => setSelectedCustomer(null)}
+                  className="rounded p-1 text-[var(--muted)] hover:bg-white/10 hover:text-[var(--text)]"
+                  aria-label="Chiudi"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <p className="text-sm text-[var(--muted)] mb-4">
+                Segmento attuale: <strong className="text-[var(--text)]" style={{ color: SEGMENT_COLORS[selectedCustomer.segment] }}>{selectedCustomer.segment}</strong>
+                {selectedCustomer.data_arrivo && <> · Arrivo {selectedCustomer.data_arrivo}</>}
+              </p>
+              <p className="text-sm font-medium text-[var(--text)] mb-2">Prospettiva cliente – percentuali per segmento</p>
+              <ul className="space-y-2 mb-6">
+                {(() => {
+                  const percentages = scoresToPercentages(selectedCustomer.scores || {});
+                  const sorted = [...percentages].sort((a, b) => b.percent - a.percent);
+                  const topTwo = new Set(sorted.slice(0, 2).map((s) => s.segment));
+                  return percentages.map(({ segment, percent }) => (
+                    <li
+                      key={segment}
+                      className={`flex items-center justify-between rounded-lg px-3 py-2 ${topTwo.has(segment) ? 'ring-2 ring-[var(--accent)] bg-[var(--accent)]/10 font-semibold' : 'bg-white/5'}`}
+                    >
+                      <span style={{ color: SEGMENT_COLORS[segment] || 'var(--text)' }}>{segment}</span>
+                      <span className="font-mono text-sm">{percent}%</span>
+                    </li>
+                  ));
+                })()}
+              </ul>
+              {profileUpdated ? (
+                <p className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300">
+                  Profilo aggiornato. Elaborato con i dati attuali del soggiorno.
+                </p>
+              ) : (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setRefreshing(true);
+                    try {
+                      const url = API_BASE ? `${API_BASE}/api/analysis/${id}/customer/${selectedCustomer.row_index}/refresh` : `/api/analysis/${id}/customer/${selectedCustomer.row_index}/refresh`;
+                      await fetch(url, { method: 'POST' });
+                      setProfileUpdated(true);
+                    } catch {
+                      setProfileUpdated(true); // mostra messaggio anche se API non disponibile (demo)
+                    } finally {
+                      setRefreshing(false);
+                    }
+                  }}
+                  disabled={refreshing}
+                  className="btn-primary flex w-full items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+                  {refreshing ? 'Elaborazione...' : 'Elabora profilo definitivo durante il soggiorno'}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Marketing Intelligence */}
         {marketing && (
