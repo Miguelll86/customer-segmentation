@@ -128,8 +128,6 @@ export default function DashboardPage() {
   const [customerDetail, setCustomerDetail] = useState<CustomerRow | null>(null);
   const [profileUpdated, setProfileUpdated] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [operatorSegment, setOperatorSegment] = useState('');
-  const [operatorNote, setOperatorNote] = useState('');
   const [notePrenotazione, setNotePrenotazione] = useState('');
   const [richiesteSpeciali, setRichiesteSpeciali] = useState('');
   const [serviziSelezionati, setServiziSelezionati] = useState<string[]>([]);
@@ -158,8 +156,6 @@ export default function DashboardPage() {
       .then((d) => {
         setCustomerDetail(d);
         const fb = (d as CustomerRow & { operator_feedback?: Record<string, unknown> }).operator_feedback;
-        setOperatorSegment((fb?.segment as string) ?? d.segment ?? '');
-        setOperatorNote('');
         setNotePrenotazione((fb?.note_prenotazione as string) ?? '');
         setRichiesteSpeciali((fb?.richieste_speciali as string) ?? '');
         setServiziSelezionati(Array.isArray(fb?.servizi_selezionati) ? (fb.servizi_selezionati as string[]) : []);
@@ -424,20 +420,20 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        {/* Scheda cliente (modal) */}
+        {/* Scheda cliente (modal orizzontale – tutto in una schermata) */}
         {selectedCustomer && displayCustomer && (
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3"
             onClick={() => setSelectedCustomer(null)}
             role="dialog"
             aria-modal="true"
             aria-labelledby="scheda-cliente-title"
           >
             <div
-              className="card max-h-[90vh] w-full max-w-lg overflow-y-auto shadow-xl"
+              className="card flex max-h-[95vh] w-full max-w-6xl flex-col overflow-hidden shadow-xl"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex items-center justify-between border-b border-[var(--border)] pb-3 mb-4">
+              <div className="flex shrink-0 items-center justify-between border-b border-[var(--border)] px-4 py-2">
                 <h2 id="scheda-cliente-title" className="text-lg font-semibold text-[var(--text)]">
                   {displayCustomer.nome_cliente || displayCustomer.cliente_id || 'Cliente'}
                 </h2>
@@ -450,186 +446,175 @@ export default function DashboardPage() {
                   <X className="h-5 w-5" />
                 </button>
               </div>
-              <p className="text-sm text-[var(--muted)] mb-4">
-                Segmento: <strong className="text-[var(--text)]" style={{ color: SEGMENT_COLORS[displayCustomer.segment] }}>{displayCustomer.segment}</strong>
-                {displayCustomer.data_arrivo && <> · Arrivo {displayCustomer.data_arrivo}</>}
-                {displayCustomer.operator_feedback && displayCustomer.operator_feedback.updated_at != null ? (
-                  <span className="ml-2 text-xs text-emerald-400">(aggiornato da operatore)</span>
-                ) : null}
-              </p>
-              <p className="text-sm font-medium text-[var(--text)] mb-2">Prime due categorie (scoring %)</p>
-              <ul className="space-y-2 mb-6">
-                {(() => {
-                  const percentages = scoresToPercentages(displayCustomer.scores || {});
-                  const topTwoOnly = [...percentages].sort((a, b) => b.percent - a.percent).slice(0, 2);
-                  return topTwoOnly.map(({ segment, percent }) => (
-                    <li
-                      key={segment}
-                      className="flex items-center justify-between rounded-lg px-3 py-2 ring-2 ring-[var(--accent)] bg-[var(--accent)]/10 font-semibold"
-                    >
-                      <span style={{ color: SEGMENT_COLORS[segment] || 'var(--text)' }}>{segment}</span>
-                      <span className="font-mono text-sm">{percent}%</span>
-                    </li>
-                  ));
-                })()}
-              </ul>
 
-              <div className="border-t border-[var(--border)] pt-4 mb-4 space-y-4">
-                <p className="text-sm font-medium text-[var(--text)]">Input operatore – raffina il segmento</p>
-                <p className="text-xs text-[var(--muted)]">Analizza note, richieste e servizi; seleziona gli indicatori comportamentali. In caso di sovrapposizione: Business → Famiglie → Premium → Coppie → Leisure.</p>
-
-                <label className="block">
-                  <span className="mb-1 block text-xs text-[var(--muted)]">Note di prenotazione</span>
-                  <textarea
-                    value={notePrenotazione}
-                    onChange={(e) => setNotePrenotazione(e.target.value)}
-                    className="input w-full min-h-[56px]"
-                    placeholder="Testo dalle note di prenotazione..."
-                    rows={2}
-                  />
-                </label>
-                <label className="block">
-                  <span className="mb-1 block text-xs text-[var(--muted)]">Richieste speciali</span>
-                  <textarea
-                    value={richiesteSpeciali}
-                    onChange={(e) => setRichiesteSpeciali(e.target.value)}
-                    className="input w-full min-h-[56px]"
-                    placeholder="Richieste particolari del cliente..."
-                    rows={2}
-                  />
-                </label>
-                <label className="block">
-                  <span className="mb-1 block text-xs text-[var(--muted)]">Servizi selezionati</span>
+              <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-y-auto p-4 lg:grid-cols-[1fr,1.4fr]">
+                {/* Colonna sinistra: profilo e percentuali */}
+                <div className="flex flex-col gap-3 border-r-0 border-[var(--border)] pr-0 lg:border-r lg:pr-4">
+                  <p className="text-sm text-[var(--muted)]">
+                    Segmento: <strong className="text-[var(--text)]" style={{ color: SEGMENT_COLORS[displayCustomer.segment] }}>{displayCustomer.segment}</strong>
+                    {displayCustomer.data_arrivo && <> · Arrivo {displayCustomer.data_arrivo}</>}
+                    {displayCustomer.operator_feedback && displayCustomer.operator_feedback.updated_at != null ? (
+                      <span className="ml-2 text-xs text-emerald-400">(aggiornato da operatore)</span>
+                    ) : null}
+                  </p>
+                  <p className="text-xs font-medium text-[var(--text)]">Prime due categorie (le % si aggiornano con l’input operatore)</p>
                   <div className="flex flex-wrap gap-2">
-                    {SERVIZI_OPTIONS.map((s) => (
-                      <label key={s} className="flex cursor-pointer items-center gap-1.5 rounded border border-[var(--border)] px-2 py-1 text-xs hover:bg-white/5">
-                        <input
-                          type="checkbox"
-                          checked={serviziSelezionati.includes(s)}
-                          onChange={(e) => setServiziSelezionati((prev) => e.target.checked ? [...prev, s] : prev.filter((x) => x !== s))}
-                        />
-                        {s}
-                      </label>
-                    ))}
-                  </div>
-                </label>
-                <div>
-                  <span className="mb-2 block text-xs text-[var(--muted)]">Indicatori comportamentali (classifica nel segmento più coerente)</span>
-                  <div className="space-y-3">
-                    {['Business', 'Famiglia', 'Coppia', 'Premium', 'Leisure'].map((seg) => {
-                      const items = indicatoriDefinitions.filter((i) => i.segment === seg);
-                      if (items.length === 0) return null;
-                      return (
-                        <div key={seg} className="rounded border border-[var(--border)]/60 bg-white/5 p-2">
-                          <p className="mb-1.5 text-xs font-medium" style={{ color: SEGMENT_COLORS[seg] }}>{seg}</p>
-                          <div className="flex flex-wrap gap-x-3 gap-y-1">
-                            {items.map((ind) => (
-                              <label key={ind.key} className="flex cursor-pointer items-center gap-1.5 text-xs">
-                                <input
-                                  type="checkbox"
-                                  checked={indicatoriSelezionati.includes(ind.key)}
-                                  onChange={(e) => setIndicatoriSelezionati((prev) => e.target.checked ? [...prev, ind.key] : prev.filter((k) => k !== ind.key))}
-                                />
-                                {ind.label}
-                              </label>
-                            ))}
-                          </div>
+                    {(() => {
+                      const percentages = scoresToPercentages(displayCustomer.scores || {});
+                      const topTwoOnly = [...percentages].sort((a, b) => b.percent - a.percent).slice(0, 2);
+                      return topTwoOnly.map(({ segment, percent }) => (
+                        <div
+                          key={segment}
+                          className="flex items-center justify-between gap-2 rounded-lg px-3 py-2 ring-2 ring-[var(--accent)] bg-[var(--accent)]/10 font-semibold"
+                        >
+                          <span style={{ color: SEGMENT_COLORS[segment] || 'var(--text)' }}>{segment}</span>
+                          <span className="font-mono text-sm">{percent}%</span>
                         </div>
-                      );
-                    })}
+                      ));
+                    })()}
+                  </div>
+                  {profileUpdated ? (
+                    <p className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300">
+                      Profilo aggiornato. Elaborato con i dati attuali del soggiorno.
+                    </p>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        setRefreshing(true);
+                        try {
+                          const url = API_BASE ? `${API_BASE}/api/analysis/${id}/customer/${selectedCustomer.row_index}/refresh` : `/api/analysis/${id}/customer/${selectedCustomer.row_index}/refresh`;
+                          await fetch(url, { method: 'POST' });
+                          setProfileUpdated(true);
+                        } catch {
+                          setProfileUpdated(true);
+                        } finally {
+                          setRefreshing(false);
+                        }
+                      }}
+                      disabled={refreshing}
+                      className="btn-secondary flex items-center justify-center gap-2 self-start disabled:opacity-50"
+                    >
+                      <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+                      {refreshing ? 'Elaborazione...' : 'Elabora profilo durante il soggiorno'}
+                    </button>
+                  )}
+                </div>
+
+                {/* Colonna destra: input operatore */}
+                <div className="space-y-3 overflow-y-auto">
+                  <p className="text-sm font-medium text-[var(--text)]">Input operatore – raffina il segmento (le percentuali si ricalcolano al salvataggio)</p>
+                  <div className="rounded-lg border border-[var(--border)]/60 bg-[var(--bg)]/80 px-3 py-2 text-xs text-[var(--muted)]">
+                    <p className="font-medium text-[var(--text)] mb-1">Legenda – parole nelle note/richieste che orientano il segmento:</p>
+                    <p><strong style={{ color: SEGMENT_COLORS['Business'] }}>Business:</strong> lavoro, fattura aziendale, meeting, scrivania, check-in rapido</p>
+                    <p><strong style={{ color: SEGMENT_COLORS['Famiglia'] }}>Famiglia:</strong> bambini, culla, camera tripla/quadrupla</p>
+                    <p><strong style={{ color: SEGMENT_COLORS['Coppia'] }}>Coppia:</strong> anniversario, romantico, cena romantica, spa coppia, late check-out</p>
+                    <p><strong style={{ color: SEGMENT_COLORS['Premium'] }}>Premium:</strong> suite, executive, transfer privato, upgrade</p>
+                    <p><strong style={{ color: SEGMENT_COLORS['Leisure'] }}>Leisure:</strong> attrazioni, parcheggio, pet friendly, cane</p>
+                  </div>
+
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <label className="block sm:col-span-2">
+                      <span className="mb-1 block text-xs text-[var(--muted)]">Note di prenotazione</span>
+                      <textarea
+                        value={notePrenotazione}
+                        onChange={(e) => setNotePrenotazione(e.target.value)}
+                        className="input w-full min-h-[48px]"
+                        placeholder="Testo dalle note di prenotazione..."
+                        rows={1}
+                      />
+                    </label>
+                    <label className="block sm:col-span-2">
+                      <span className="mb-1 block text-xs text-[var(--muted)]">Richieste speciali</span>
+                      <textarea
+                        value={richiesteSpeciali}
+                        onChange={(e) => setRichiesteSpeciali(e.target.value)}
+                        className="input w-full min-h-[48px]"
+                        placeholder="Richieste particolari del cliente..."
+                        rows={1}
+                      />
+                    </label>
+                  </div>
+                  <label className="block">
+                    <span className="mb-1 block text-xs text-[var(--muted)]">Servizi selezionati</span>
+                    <div className="flex flex-wrap gap-2">
+                      {SERVIZI_OPTIONS.map((s) => (
+                        <label key={s} className="flex cursor-pointer items-center gap-1.5 rounded border border-[var(--border)] px-2 py-1 text-xs hover:bg-white/5">
+                          <input
+                            type="checkbox"
+                            checked={serviziSelezionati.includes(s)}
+                            onChange={(e) => setServiziSelezionati((prev) => e.target.checked ? [...prev, s] : prev.filter((x) => x !== s))}
+                          />
+                          {s}
+                        </label>
+                      ))}
+                    </div>
+                  </label>
+                  <div>
+                    <span className="mb-2 block text-xs text-[var(--muted)]">Indicatori comportamentali</span>
+                    <div className="flex flex-wrap gap-x-4 gap-y-2">
+                      {['Business', 'Famiglia', 'Coppia', 'Premium', 'Leisure'].map((seg) => {
+                        const items = indicatoriDefinitions.filter((i) => i.segment === seg);
+                        if (items.length === 0) return null;
+                        return (
+                          <div key={seg} className="rounded border border-[var(--border)]/60 bg-white/5 p-2">
+                            <p className="mb-1 text-xs font-medium" style={{ color: SEGMENT_COLORS[seg] }}>{seg}</p>
+                            <div className="flex flex-wrap gap-x-2 gap-y-0.5">
+                              {items.map((ind) => (
+                                <label key={ind.key} className="flex cursor-pointer items-center gap-1 text-xs">
+                                  <input
+                                    type="checkbox"
+                                    checked={indicatoriSelezionati.includes(ind.key)}
+                                    onChange={(e) => setIndicatoriSelezionati((prev) => e.target.checked ? [...prev, ind.key] : prev.filter((k) => k !== ind.key))}
+                                  />
+                                  {ind.label}
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        setFeedbackSaving(true);
+                        setFeedbackSaved(false);
+                        try {
+                          const url = API_BASE ? `${API_BASE}/api/analysis/${id}/customer/${selectedCustomer.row_index}/feedback` : `/api/analysis/${id}/customer/${selectedCustomer.row_index}/feedback`;
+                          const res = await fetch(url, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              note_prenotazione: notePrenotazione || undefined,
+                              richieste_speciali: richiesteSpeciali || undefined,
+                              servizi_selezionati: serviziSelezionati.length ? serviziSelezionati : undefined,
+                              indicatori: indicatoriSelezionati.length ? indicatoriSelezionati : undefined,
+                            }),
+                          });
+                          await res.json().catch(() => ({}));
+                          setFeedbackSaved(true);
+                          const updated = await fetchApi<CustomerRow>(`/api/analysis/${id}/customer/${selectedCustomer.row_index}`);
+                          setCustomerDetail(updated);
+                        } catch {
+                          setFeedbackSaved(false);
+                        } finally {
+                          setFeedbackSaving(false);
+                        }
+                      }}
+                      disabled={feedbackSaving}
+                      className="btn-primary disabled:opacity-50"
+                    >
+                      {feedbackSaving ? 'Salvataggio...' : 'Salva input e aggiorna %'}
+                    </button>
+                    {feedbackSaved && (
+                      <span className="text-sm text-emerald-400">Salvato: segmento e percentuali aggiornati.</span>
+                    )}
                   </div>
                 </div>
-                <label className="block">
-                  <span className="mb-1 block text-xs text-[var(--muted)]">Segmento confermato / override (opzionale)</span>
-                  <select
-                    value={operatorSegment}
-                    onChange={(e) => setOperatorSegment(e.target.value)}
-                    className="input w-full"
-                  >
-                    <option value="">— Calcola da indicatori sopra —</option>
-                    <option value="Business">Business</option>
-                    <option value="Leisure">Leisure</option>
-                    <option value="Coppia">Coppia</option>
-                    <option value="Famiglia">Famiglia</option>
-                    <option value="Premium">Premium</option>
-                  </select>
-                </label>
-                <label className="block">
-                  <span className="mb-1 block text-xs text-[var(--muted)]">Note operative</span>
-                  <textarea
-                    value={operatorNote}
-                    onChange={(e) => setOperatorNote(e.target.value)}
-                    className="input w-full min-h-[48px]"
-                    placeholder="Motivo correzione, contesto..."
-                    rows={1}
-                  />
-                </label>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    setFeedbackSaving(true);
-                    setFeedbackSaved(false);
-                    try {
-                      const url = API_BASE ? `${API_BASE}/api/analysis/${id}/customer/${selectedCustomer.row_index}/feedback` : `/api/analysis/${id}/customer/${selectedCustomer.row_index}/feedback`;
-                      const res = await fetch(url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          segment: operatorSegment || undefined,
-                          note_prenotazione: notePrenotazione || undefined,
-                          richieste_speciali: richiesteSpeciali || undefined,
-                          servizi_selezionati: serviziSelezionati.length ? serviziSelezionati : undefined,
-                          indicatori: indicatoriSelezionati.length ? indicatoriSelezionati : undefined,
-                          note: operatorNote || undefined,
-                        }),
-                      });
-                      const data = await res.json().catch(() => ({}));
-                      setFeedbackSaved(true);
-                      const updated = await fetchApi<CustomerRow>(`/api/analysis/${id}/customer/${selectedCustomer.row_index}`);
-                      setCustomerDetail(updated);
-                      if (data.segment) setOperatorSegment(data.segment);
-                    } catch {
-                      setFeedbackSaved(false);
-                    } finally {
-                      setFeedbackSaving(false);
-                    }
-                  }}
-                  disabled={feedbackSaving}
-                  className="btn-primary w-full disabled:opacity-50"
-                >
-                  {feedbackSaving ? 'Salvataggio...' : 'Salva e aggiorna segmento'}
-                </button>
-                {feedbackSaved && (
-                  <p className="text-sm text-emerald-400">Input salvato. Segmento aggiornato in base a note, richieste e indicatori.</p>
-                )}
               </div>
-
-              {profileUpdated ? (
-                <p className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300">
-                  Profilo aggiornato. Elaborato con i dati attuali del soggiorno.
-                </p>
-              ) : (
-                <button
-                  type="button"
-                  onClick={async () => {
-                    setRefreshing(true);
-                    try {
-                      const url = API_BASE ? `${API_BASE}/api/analysis/${id}/customer/${selectedCustomer.row_index}/refresh` : `/api/analysis/${id}/customer/${selectedCustomer.row_index}/refresh`;
-                      await fetch(url, { method: 'POST' });
-                      setProfileUpdated(true);
-                    } catch {
-                      setProfileUpdated(true);
-                    } finally {
-                      setRefreshing(false);
-                    }
-                  }}
-                  disabled={refreshing}
-                  className="btn-secondary flex w-full items-center justify-center gap-2 disabled:opacity-50"
-                >
-                  <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-                  {refreshing ? 'Elaborazione...' : 'Elabora profilo definitivo durante il soggiorno'}
-                </button>
-              )}
             </div>
           </div>
         )}

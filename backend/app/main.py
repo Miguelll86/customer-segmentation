@@ -102,6 +102,17 @@ def _effective_revenue(c) -> float:
     return 0.0
 
 
+def _scores_with_operator_boost(scores_dict: dict, chosen_segment: str) -> dict:
+    """Dato lo scoring originale e il segmento da feedback operatore, restituisce score con boost per far riflettere le % l'input operatore."""
+    key_map = {"Business": "business", "Leisure": "leisure", "Coppia": "coppia", "Famiglia": "famiglia", "Premium": "premium"}
+    key = key_map.get(chosen_segment)
+    if not key or key not in scores_dict:
+        return scores_dict
+    out = dict(scores_dict)
+    out[key] = (out.get(key) or 0) + 15
+    return out
+
+
 def _effective_adr(c) -> float:
     """ADR del cliente: spesa_media o, se mancante, revenue / numero_notti."""
     if c.spesa_media is not None and c.spesa_media > 0:
@@ -205,16 +216,18 @@ def get_customer(analysis_id: str, row_index: int):
         abort(404, "Cliente non trovato")
     feedback = (_operator_feedback.get(analysis_id) or {}).get(row_index)
     segment_display = found.segment.value
+    scores_out = found.scores.to_dict()
     if feedback and feedback.get("segment"):
         try:
             Segment(feedback["segment"])  # valida
             segment_display = feedback["segment"]
+            scores_out = _scores_with_operator_boost(scores_out, feedback["segment"])
         except ValueError:
             pass
     out = {
         "row_index": found.row_index,
         "segment": segment_display,
-        "scores": found.scores.to_dict(),
+        "scores": scores_out,
         "numero_notti": found.numero_notti,
         "numero_ospiti": found.numero_ospiti,
         "canale": found.canale,
@@ -237,10 +250,9 @@ def get_customer(analysis_id: str, row_index: int):
 @app.route("/api/analysis/<analysis_id>/customer/<int:row_index>/feedback", methods=["POST"])
 def save_operator_feedback(analysis_id: str, row_index: int):
     """
-    Salva input operatore: note, richieste speciali, servizi, indicatori comportamentali.
-    Se sono presenti indicatori o testo (note/richieste), il segmento viene ricalcolato con le
-    regole di priorità (Business > Famiglie > Premium > Coppie > Leisure). Segmento esplicito fa override.
-    Body: { "segment"?, "note_prenotazione"?, "richieste_speciali"?, "servizi_selezionati"?, "indicatori"?: [] }
+    Salva input operatore: note di prenotazione, richieste speciali, servizi, indicatori.
+    Il segmento viene ricalcolato solo da indicatori e testo (note/richieste).
+    Body: { "note_prenotazione"?, "richieste_speciali"?, "servizi_selezionati"?, "indicatori"?: [] }
     """
     customers = _store.get(analysis_id)
     if not customers:
@@ -249,13 +261,6 @@ def save_operator_feedback(analysis_id: str, row_index: int):
     if not found:
         abort(404, "Cliente non trovato")
     data = request.get_json(silent=True) or {}
-    segment_explicit = data.get("segment")
-    if segment_explicit is not None:
-        try:
-            Segment(segment_explicit)
-        except ValueError:
-            abort(400, f"Segmento non valido: {segment_explicit}. Usa: Business, Leisure, Coppia, Famiglia, Premium.")
-
     note_prenotazione = (data.get("note_prenotazione") or "").strip() or None
     richieste_speciali = (data.get("richieste_speciali") or "").strip() or None
     servizi_selezionati = data.get("servizi_selezionati")
@@ -274,19 +279,17 @@ def save_operator_feedback(analysis_id: str, row_index: int):
             servizi_selezionati=servizi_selezionati,
         ).value
 
-    segment_final = segment_explicit if segment_explicit is not None else segment_computed
+    segment_final = segment_computed
     if segment_final is None and analysis_id in _operator_feedback and row_index in _operator_feedback[analysis_id]:
         segment_final = _operator_feedback[analysis_id][row_index].get("segment")
 
     if analysis_id not in _operator_feedback:
         _operator_feedback[analysis_id] = {}
-    note_operatore = (data.get("note") or "").strip() or None
     payload = {
         "note_prenotazione": note_prenotazione,
         "richieste_speciali": richieste_speciali,
         "servizi_selezionati": servizi_selezionati,
         "indicatori": indicatori,
-        "note": note_operatore,
         "segment_computed": segment_computed,
         "segment": segment_final,
         "updated_at": datetime.utcnow().isoformat() + "Z",
