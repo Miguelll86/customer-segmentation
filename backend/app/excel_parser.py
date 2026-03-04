@@ -63,21 +63,30 @@ def _map_columns(df: pd.DataFrame) -> dict[str, str]:
 
 def _get_day_name(val: Any) -> str:
     """Da data o numero 0-6 o stringa giorno restituisce abbreviazione Lun/Mar/..."""
+    days = ["lun", "mar", "mer", "gio", "ven", "sab", "dom"]
     if pd.isna(val):
         return ""
     if isinstance(val, (int, float)):
-        # 0=lun, 6=dom
-        days = ["lun", "mar", "mer", "gio", "ven", "sab", "dom"]
         try:
             return days[int(val) % 7]
         except (ValueError, TypeError):
             return ""
     if isinstance(val, datetime):
-        days = ["lun", "mar", "mer", "gio", "ven", "sab", "dom"]
         return days[val.weekday()]
     s = str(val).strip().lower()
+    # Prima prova a interpretare come data (es. "2024-06-15"): così non restituiamo "202"
+    dt = _parse_date(val)
+    if dt is not None:
+        return days[dt.weekday()]
+    # Stringa numerica (es. "202" da Excel): usa come numero giorno
+    if s.isdigit() or (s.replace(".", "", 1).replace(",", "", 1).isdigit()):
+        try:
+            n = int(float(s.replace(",", ".")))
+            return days[n % 7]
+        except (ValueError, TypeError):
+            pass
     if len(s) >= 2:
-        return s[:3]  # lun, mar, ...
+        return s[:3]  # lun, mar, lunedì -> lun
     return s
 
 
@@ -229,11 +238,10 @@ def parse_and_segment(df: pd.DataFrame) -> tuple[list[SegmentedCustomer], float 
             giorno = _get_day_name(giorno_raw)
             storico = int(pd.to_numeric(get(row, "storico_soggiorni", 0), errors="coerce") or 0)
             spesa = _norm_float(get(row, "spesa_media"))
+            totale_val = _norm_float(get(row, "totale_soggiorno"))
             # Se c'è "totale" (costo soggiorno) e non abbiamo spesa per notte, ricavala: totale / giorni
-            if spesa is None and notti > 0:
-                totale_val = _norm_float(get(row, "totale_soggiorno"))
-                if totale_val is not None and totale_val > 0:
-                    spesa = round(totale_val / notti, 2)
+            if spesa is None and notti > 0 and totale_val is not None and totale_val > 0:
+                spesa = round(totale_val / notti, 2)
             cat_camera = str(get(row, "categoria_camera", "") or "")
             data_arrivo_raw = get(row, "data_arrivo")
             data_arrivo = None
@@ -294,7 +302,11 @@ def parse_and_segment(df: pd.DataFrame) -> tuple[list[SegmentedCustomer], float 
                 numero_bambini=numero_bambini,
             )
             segment = assign_segment(scores)
-            revenue = (spesa * notti) if spesa is not None else None
+            # Revenue: da totale soggiorno se presente, altrimenti spesa * notti
+            if totale_val is not None and totale_val > 0:
+                revenue = round(totale_val, 2)
+            else:
+                revenue = (spesa * notti) if spesa is not None else None
             results.append(
                 SegmentedCustomer(
                     row_index=i,
@@ -322,9 +334,19 @@ def parse_and_segment(df: pd.DataFrame) -> tuple[list[SegmentedCustomer], float 
 
 
 def _norm_float(v: Any) -> float | None:
+    """Converte in float; accetta formato europeo (1.234,56 o 1 234,56)."""
     if v is None or (isinstance(v, float) and (v != v)):
         return None
     try:
         return float(v)
+    except (ValueError, TypeError):
+        pass
+    s = str(v).strip().replace(" ", "").replace("\u00a0", "")
+    if "," in s and "." in s:
+        # Mantieni solo la virgola come decimale
+        s = s.replace(".", "")
+    s = s.replace(",", ".")
+    try:
+        return float(s)
     except (ValueError, TypeError):
         return None

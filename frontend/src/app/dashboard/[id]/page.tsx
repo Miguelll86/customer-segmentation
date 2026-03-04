@@ -356,9 +356,8 @@ export default function DashboardPage() {
                     <th className="p-3">Notti</th>
                     <th className="p-3">Ospiti</th>
                     <th className="p-3">Canale</th>
-                    <th className="p-3">Giorno</th>
                     <th className="p-3">Storico</th>
-                    <th className="p-3">Spesa media</th>
+                    <th className="p-3">Costo giornaliero</th>
 <th className="p-3">Revenue</th>
                                                     <th className="p-3">Anticipo</th>
                                                     <th className="p-3">Prenotante</th>
@@ -390,9 +389,8 @@ export default function DashboardPage() {
                       <td className="p-3">{c.numero_notti ?? '-'}</td>
                       <td className="p-3">{c.numero_ospiti ?? '-'}</td>
                       <td className="p-3">{c.canale ?? '-'}</td>
-                      <td className="p-3">{c.giorno_arrivo ?? '-'}</td>
                       <td className="p-3">{c.storico_soggiorni ?? '-'}</td>
-                      <td className="p-3">{c.spesa_media != null ? `€ ${c.spesa_media.toFixed(0)}` : '-'}</td>
+                      <td className="p-3">{c.spesa_media != null ? `€ ${c.spesa_media.toFixed(2)}` : (c.revenue != null && c.numero_notti != null && c.numero_notti > 0 ? `€ ${(c.revenue / c.numero_notti).toFixed(2)}` : '-')}</td>
 <td className="p-3">{c.revenue != null ? `€ ${c.revenue.toFixed(0)}` : '-'}</td>
                                                       <td className="p-3">{c.anticipo_giorni != null ? `${c.anticipo_giorni} gg` : '-'}</td>
                                                       <td className="p-3">{c.prenotante ?? '-'}</td>
