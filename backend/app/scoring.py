@@ -52,7 +52,6 @@ def compute_scores(
     numero_ospiti: int,
     canale: str,
     giorno_arrivo: str,
-    storico_soggiorni: int,
     spesa_media: float | None,
     categoria_camera: str,
     threshold_top25: float | None,
@@ -62,7 +61,7 @@ def compute_scores(
     prenotante: str | None = None,
     numero_bambini: int | None = None,
 ) -> Scores:
-    """Calcola i 5 punteggi per un singolo record (combinazioni giorno+notti, spesa, anticipo, prenotante, bambini)."""
+    """Calcola i 4 punteggi per un singolo record (combinazioni giorno+notti, spesa, anticipo, prenotante, bambini). Storico soggiorni non usato."""
     cn = _norm(canale)
     gn = _norm(giorno_arrivo)
     is_weekend = gn in {"ven", "sab", "dom", "venerdì", "sabato", "domenica", "friday", "saturday", "sunday"}
@@ -94,8 +93,6 @@ def compute_scores(
         business += 2
     if cn in CANALI_CORPORATE_GDS or "gds" in cn or "corporate" in cn:
         business += 2
-    if storico_soggiorni > 0 and numero_notti <= 2:
-        business += 1
     # Anticipo: last minute (0-7 giorni) spesso business
     if anticipo_giorni is not None and 0 <= anticipo_giorni <= 7:
         business += 2
@@ -112,8 +109,6 @@ def compute_scores(
         leisure += 1
     if any(x in cn for x in ["ota", "booking", "expedia", "leisure"]):
         leisure += 2
-    if storico_soggiorni == 0:
-        leisure += 1
     # Spesa sotto media → spesso leisure
     if media_spesa is not None and spesa_media is not None and spesa_media < media_spesa:
         leisure += 1
@@ -155,8 +150,6 @@ def compute_scores(
         leisure += 4
     if media_spesa is not None and spesa_media is not None and spesa_media >= media_spesa:
         leisure += 1
-    if storico_soggiorni >= 3:
-        leisure += 3
     if numero_notti >= 4:
         leisure += 2
     if cn in CANALI_DIRETTO or "direct" in cn or "diretto" in cn:

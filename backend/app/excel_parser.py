@@ -19,7 +19,6 @@ COLUMN_ALIASES = {
     "numero_ospiti": ["ospiti", "guests", "pax", "numero ospiti", "n. ospiti", "prenotati"],
     "canale": ["canale", "channel", "canale prenotazione", "source", "distribution"],
     "giorno_arrivo": ["giorno arrivo", "day", "arrival day", "giorno", "weekday", "giorno_arrivo"],
-    "storico_soggiorni": ["storico", "storico soggiorni", "previous stays", "stays", "n. soggiorni", "soggiorni precedenti"],
     "spesa_media": ["spesa", "spesa media", "adr", "amount", "importo", "spesa_media", "spesa media", "tariffa", "tariff", "rate", "prezzo"],
     "totale_soggiorno": ["totale", "revenue", "totale costo soggiorno", "totale (totale costo soggiorno)", "costo totale", "importo totale", "total", "totale soggiorno"],
     "cliente_id": ["id", "customer id", "guest id", "codice cliente", "id cliente"],
@@ -155,16 +154,14 @@ def parse_and_segment(df: pd.DataFrame) -> tuple[list[SegmentedCustomer], float 
             elif i == 5:
                 col_map["giorno_arrivo"] = c
             elif i == 6:
-                col_map["storico_soggiorni"] = c
-            elif i == 7:
                 col_map["spesa_media"] = c
-            elif i == 8:
+            elif i == 7:
                 col_map["categoria_camera"] = c
-            elif i == 9:
+            elif i == 8:
                 col_map["anticipo_giorni"] = c
-            elif i == 10:
+            elif i == 9:
                 col_map["prenotante"] = c
-            elif i == 11:
+            elif i == 10:
                 col_map["numero_bambini"] = c
 
     def get(row: pd.Series, key: str, default: Any = None):
@@ -236,7 +233,6 @@ def parse_and_segment(df: pd.DataFrame) -> tuple[list[SegmentedCustomer], float 
                     canale = str(prenotante_raw).strip()
             giorno_raw = get(row, "giorno_arrivo") or get(row, "data_arrivo")
             giorno = _get_day_name(giorno_raw)
-            storico = int(pd.to_numeric(get(row, "storico_soggiorni", 0), errors="coerce") or 0)
             spesa = _norm_float(get(row, "spesa_media"))
             totale_val = _norm_float(get(row, "totale_soggiorno"))
             # Se c'è "totale" (costo soggiorno) e non abbiamo spesa per notte, ricavala: totale / giorni
@@ -291,7 +287,6 @@ def parse_and_segment(df: pd.DataFrame) -> tuple[list[SegmentedCustomer], float 
                 numero_ospiti=ospiti,
                 canale=canale,
                 giorno_arrivo=giorno,
-                storico_soggiorni=storico,
                 spesa_media=spesa,
                 categoria_camera=cat_camera,
                 threshold_top25=threshold_top25,
@@ -316,7 +311,7 @@ def parse_and_segment(df: pd.DataFrame) -> tuple[list[SegmentedCustomer], float 
                     numero_ospiti=ospiti,
                     canale=canale or None,
                     giorno_arrivo=giorno or None,
-                    storico_soggiorni=storico,
+                    storico_soggiorni=None,
                     spesa_media=spesa,
                     cliente_id=str(get(row, "cliente_id", "")) or None,
                     nome_cliente=str(get(row, "nome_cliente", "")).strip() or None,

@@ -24,7 +24,6 @@ def main():
         ospiti = random.choices([1, 2, 3, 4, 5], weights=[20, 35, 25, 15, 5])[0]
         canale = random.choice(CANALI)
         giorno = random.choice(GIORNI)
-        storico = random.choices([0, 1, 2, 3, 5], weights=[40, 25, 20, 10, 5])[0]
         spesa = round(random.uniform(80, 350), 2)
         data = f"2024-{random.randint(1, 12):02d}-{random.randint(1, 28):02d}"
         camera = random.choice(CATEGORIE)
@@ -38,7 +37,6 @@ def main():
             "numero_ospiti": ospiti,
             "canale": canale,
             "giorno_arrivo": giorno,
-            "storico_soggiorni": storico,
             "spesa_media": spesa,
             "categoria_camera": camera,
             "anticipo_giorni": anticipo,

@@ -37,7 +37,6 @@ Non serve rinominare le colonne: puoi caricare l’Excel così com’è. L’app
 | **canale** | channel, canale prenotazione, source | Canale di prenotazione | Booking.com, corporate, direct |
 | **giorno arrivo** | day, weekday, giorno | Giorno della settimana (lun-dom) o numero 0-6 | ven |
 | **spesa media** | spesa, tariffa, rate, adr, revenue, importo | Tariffa/spesa per notte (€) | 120.50 |
-| **storico soggiorni** | storico, previous stays, n. soggiorni | Numero di soggiorni precedenti del cliente | 2 |
 | **categoria camera** | camera, room, room type, categoria | Tipo di camera | Deluxe, Suite |
 
 ---
@@ -99,7 +98,7 @@ Non serve rinominare le colonne: puoi caricare l’Excel così com’è. L’app
 ## Esempio intestazioni (copy-paste per Excel)
 
 ```
-data arrivo	numero notti	numero ospiti	canale	giorno arrivo	storico soggiorni	spesa media	categoria camera	cliente_id	nome cliente	anticipo giorni	prenotante	numero bambini
+data arrivo	numero notti	numero ospiti	canale	giorno arrivo	spesa media	categoria camera	cliente_id	nome cliente	anticipo giorni	prenotante	numero bambini
 ```
 
 (separati da tabulazione; in CSV usa la virgola)

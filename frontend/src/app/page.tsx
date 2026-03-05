@@ -66,7 +66,7 @@ export default function HomePage() {
             Caricamento dati arrivi
           </h2>
           <p className="mb-4 text-sm text-[var(--muted)]">
-            File <strong>.xlsx</strong> o <strong>.csv</strong>. Colonne base: data arrivo, numero notti, numero ospiti, canale, giorno arrivo, storico soggiorni, spesa media, categoria camera. Per l’algoritmo avanzato aggiungi: <strong>anticipo giorni</strong> (o data prenotazione), <strong>prenotante</strong> (chi ha prenotato), <strong>numero bambini</strong>. Vedi <code className="rounded bg-white/10 px-1">FORMATO-EXCEL-GESTIONALE.md</code> nel progetto per l’export dal gestionale. Se l’Excel dà errore, salva come <strong>CSV UTF-8</strong> e ricarica.
+            File <strong>.xlsx</strong> o <strong>.csv</strong>. Colonne base: data arrivo, numero notti, numero ospiti, canale, giorno arrivo, spesa media, categoria camera. Per l’algoritmo avanzato aggiungi: <strong>anticipo giorni</strong> (o data prenotazione), <strong>prenotante</strong> (chi ha prenotato), <strong>numero bambini</strong>. Vedi <code className="rounded bg-white/10 px-1">FORMATO-EXCEL-GESTIONALE.md</code> nel progetto per l’export dal gestionale. Se l’Excel dà errore, salva come <strong>CSV UTF-8</strong> e ricarica.
           </p>
           <form onSubmit={handleUpload} className="flex flex-wrap items-end gap-4">
             <label className="flex-1 min-w-[200px]">

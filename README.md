@@ -43,10 +43,10 @@ Apri [http://localhost:3000](http://localhost:3000). Carica un file Excel (vedi 
 
 Il file deve contenere almeno alcune di queste colonne (nomi in italiano o inglese):
 
-| numero notti | numero ospiti | canale   | giorno arrivo | storico soggiorni | spesa media | data arrivo | categoria camera |
-|--------------|---------------|----------|---------------|-------------------|-------------|-------------|------------------|
-| 2            | 1             | corporate| lun           | 3                 | 180         | 2024-01-15  | Deluxe           |
-| 4            | 2             | booking  | ven           | 0                 | 120         | 2024-02-20  | Standard         |
+| numero notti | numero ospiti | canale   | giorno arrivo | spesa media | data arrivo | categoria camera |
+|--------------|---------------|----------|---------------|-------------|-------------|------------------|
+| 2            | 1             | corporate| lun           | 180         | 2024-01-15  | Deluxe           |
+| 4            | 2             | booking  | ven           | 120         | 2024-02-20  | Standard         |
 
 Per un file di prova, dalla cartella `backend` esegui:  
 `python scripts/generate_sample_excel.py`  
@@ -69,8 +69,8 @@ Verrà creato `backend/sample_arrivi.xlsx`.
 
 ## Algoritmo di scoring
 
-Assegnazione **una sola categoria** per cliente tramite punteggio ponderato. In parità: **Premium > Business > Famiglia > Coppia > Leisure**.  
-Parametri: numero notti, numero ospiti, canale, giorno arrivo, storico soggiorni, spesa media (top 25% per Premium), categoria camera.
+Assegnazione **una sola categoria** per cliente tramite punteggio ponderato. In parità: **Business > Famiglia > Coppia > Leisure**.  
+Parametri: numero notti, numero ospiti, canale, giorno arrivo, spesa media (e top 25% per Leisure/Premium), categoria camera, anticipo, prenotante, numero bambini.
 
 ## Estensioni future
 
