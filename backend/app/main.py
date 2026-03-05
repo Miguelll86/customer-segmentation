@@ -138,9 +138,9 @@ def get_overview(analysis_id: str):
         count = len(list_c)
         pct = (count / total * 100) if total else 0
         revenues = [_effective_revenue(c) for c in list_c]
-        adrs = [_effective_adr(c) for c in list_c if _effective_adr(c) > 0]
         rev_tot = sum(revenues)
-        adr = sum(adrs) / len(adrs) if adrs else 0
+        notti_seg = sum((c.numero_notti or 0) for c in list_c)
+        adr = (rev_tot / notti_seg) if notti_seg else 0
         val_medio = (rev_tot / count) if count else 0
         segment_stats.append({
             "segment": seg.value,
@@ -151,9 +151,8 @@ def get_overview(analysis_id: str):
             "valore_cliente_medio": round(val_medio, 2),
         })
     total_revenue = sum(s["revenue_totale"] for s in segment_stats)
-    adr_sum = sum(_effective_adr(c) for c in customers)
-    adr_count = sum(1 for c in customers if _effective_adr(c) > 0)
-    overall_adr = adr_sum / adr_count if adr_count else 0
+    total_notti = sum((c.numero_notti or 0) for c in customers)
+    overall_adr = (total_revenue / total_notti) if total_notti else 0
     return jsonify({
         "total_arrivals": total,
         "total_revenue": round(total_revenue, 2),
