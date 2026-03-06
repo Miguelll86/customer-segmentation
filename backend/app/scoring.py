@@ -1,6 +1,16 @@
 """
 Algoritmo di scoring ponderato per segmentazione clienti.
 Una sola categoria primaria per cliente; in parità: Business > Famiglia > Coppia > Leisure (Leisure include ex-Premium).
+
+Parametri usati per segmento:
+- numero_notti, giorno_arrivo: tutti (combinazioni giorno+notti).
+- numero_ospiti: Business (1 o <=2 per soggiorni brevi), Coppia (solo se >=2), Famiglia (solo se >=2, forte se >=3).
+- numero_bambini: Coppia (0 con 2 ospiti), Famiglia (>=1).
+- canale: Business (corporate/GDS), Leisure (OTA/diretto), Coppia (OTA), Famiglia (OTA).
+- spesa_media, media_spesa, threshold_top25, categoria_camera: Leisure (e combinazioni).
+- is_vacation_period: Famiglia.
+- anticipo_giorni: Business (0-7), Leisure (30+), Coppia (14+), Famiglia (30+).
+- prenotante: Business (agenzia/azienda), Leisure (cliente/guest).
 """
 from typing import Any
 
@@ -70,26 +80,31 @@ def compute_scores(
 
     # --- Combinazioni giorno arrivo + numero notti ---
     if is_weekend and numero_notti == 1:
-        business += 2  # weekend breve spesso business
-        coppia += 1
+        if numero_ospiti <= 2:
+            business += 2  # weekend breve spesso business (singolo/coppia)
+        if numero_ospiti >= 2:
+            coppia += 1
     if is_weekend and 2 <= numero_notti <= 3:
-        coppia += 3
+        if numero_ospiti >= 2:
+            coppia += 3
         leisure += 2
     if is_weekend and numero_notti >= 4:
-        famiglia += 2
+        if numero_ospiti >= 2:
+            famiglia += 2
         leisure += 1
-    if is_midweek and 1 <= numero_notti <= 2:
-        business += 3
+    if is_midweek and 1 <= numero_notti <= 2 and numero_ospiti <= 2:
+        business += 3  # soggiorno breve infrasettimanale tipico business (1-2 ospiti)
     if is_midweek and numero_notti >= 3:
         leisure += 1
-        famiglia += 1
+        if numero_ospiti >= 2:
+            famiglia += 1
 
-    # --- BUSINESS ---
-    if gn in GIORNI_MIDWEEK:
+    # --- BUSINESS (sensato per 1-2 ospiti: singolo o coppia in trasferta) ---
+    if numero_ospiti <= 2 and gn in GIORNI_MIDWEEK:
         business += 2
     if numero_ospiti == 1:
         business += 3
-    if 1 <= numero_notti <= 2:
+    if numero_ospiti <= 2 and 1 <= numero_notti <= 2:
         business += 2
     if cn in CANALI_CORPORATE_GDS or "gds" in cn or "corporate" in cn:
         business += 2
@@ -118,32 +133,38 @@ def compute_scores(
     if prenotante and ("cliente" in _norm(prenotante) or "guest" in _norm(prenotante)):
         leisure += 1
 
-    # --- COPPIA ---
+    # --- COPPIA (solo se almeno 2 ospiti: una coppia non può essere 1 persona) ---
     if numero_ospiti == 2:
         coppia += 3
-    if 1 <= numero_notti <= 3:
+    if numero_ospiti >= 2 and 1 <= numero_notti <= 3:
         coppia += 2
-    if gn in GIORNI_COPPIA:
+    if numero_ospiti >= 2 and gn in GIORNI_COPPIA:
         coppia += 3
-    if any(x in cn for x in ["ota", "booking", "expedia", "leisure"]):
+    if numero_ospiti >= 2 and any(x in cn for x in ["ota", "booking", "expedia", "leisure"]):
         coppia += 1
     if numero_bambini is not None and numero_bambini == 0 and numero_ospiti == 2:
         coppia += 2
+    # Coppie spesso prenotano in anticipo (anniversari, occasioni)
+    if numero_ospiti >= 2 and anticipo_giorni is not None and anticipo_giorni >= 14:
+        coppia += 1
 
-    # --- FAMIGLIA ---
+    # --- FAMIGLIA (solo se almeno 2 ospiti: nucleo familiare) ---
     if numero_ospiti >= 3:
         famiglia += 3
-    if numero_notti >= 3:
+    if numero_ospiti >= 2 and numero_notti >= 3:
         famiglia += 2
-    if gn in GIORNI_WEEKEND:
+    if numero_ospiti >= 2 and gn in GIORNI_WEEKEND:
         famiglia += 2
-    if is_vacation_period:
+    if numero_ospiti >= 2 and is_vacation_period:
         famiglia += 2
     # Presenza bambini → forte segnale famiglia
     if numero_bambini is not None and numero_bambini >= 1:
         famiglia += 4
-    if anticipo_giorni is not None and anticipo_giorni >= 30:
+    if numero_ospiti >= 2 and anticipo_giorni is not None and anticipo_giorni >= 30:
         famiglia += 1  # prenotazioni family spesso in anticipo
+    # Canale OTA spesso usato per prenotazioni famiglia
+    if numero_ospiti >= 2 and any(x in cn for x in ["ota", "booking", "expedia", "leisure"]):
+        famiglia += 1
 
     # --- LEISURE (include ex-Premium: alta spesa, categoria camera, direct) ---
     if _is_high_spend(spesa_media, threshold_top25):
