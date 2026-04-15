@@ -62,6 +62,9 @@ class CampaignItem:
     descrizione: str
     tipo: str
     segmento: Segment
+    whatsapp_template: Optional[str] = None
+    email_subject: Optional[str] = None
+    email_template: Optional[str] = None
 
     def to_dict(self) -> dict:
         return {
@@ -69,4 +72,7 @@ class CampaignItem:
             "descrizione": self.descrizione,
             "tipo": self.tipo,
             "segmento": self.segmento.value,
+            "whatsapp_template": self.whatsapp_template,
+            "email_subject": self.email_subject,
+            "email_template": self.email_template,
         }

@@ -3,7 +3,7 @@
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, TrendingUp, Users, Euro, PieChart, X, RefreshCw } from 'lucide-react';
+import { ArrowLeft, TrendingUp, Users, Euro, PieChart, X, RefreshCw, Copy } from 'lucide-react';
 import {
   PieChart as RechartsPie,
   Pie,
@@ -71,7 +71,14 @@ type MarketingSegment = {
   revenue_potenziale_stimata: number;
   conversion_rate_storico: number;
   roi_stimato: number;
-  campagne: Array<{ titolo: string; descrizione: string; tipo: string }>;
+  campagne: Array<{
+    titolo: string;
+    descrizione: string;
+    tipo: string;
+    whatsapp_template?: string;
+    email_subject?: string;
+    email_template?: string;
+  }>;
 };
 
 type Marketing = {
@@ -111,6 +118,16 @@ function fetchApi<T>(path: string): Promise<T> {
     if (!r.ok) throw new Error((data as { detail?: string }).detail || `Errore ${r.status}`);
     return data as T;
   });
+}
+
+async function copyTextToClipboard(text: string): Promise<boolean> {
+  try {
+    if (!text) return false;
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export default function DashboardPage() {
@@ -477,19 +494,49 @@ export default function DashboardPage() {
                     const topTwo = [...percentages].sort((a, b) => b.percent - a.percent).slice(0, 2);
                     const segNames = topTwo.map((p) => p.segment);
                     const campaignsBySeg = new Map(marketing.segmenti.map((s) => [s.segment, s.campagne || []]));
-                    const picked: Array<{ titolo: string; descrizione: string; tipo: string; segment: string }> = [];
+                    const picked: Array<{
+                      titolo: string;
+                      descrizione: string;
+                      tipo: string;
+                      segment: string;
+                      whatsapp_template?: string;
+                      email_subject?: string;
+                      email_template?: string;
+                    }> = [];
                     const takeFirst = 3;
                     const takeSecond = 2;
                     if (segNames[0]) {
                       const list = campaignsBySeg.get(segNames[0]) || [];
                       for (let i = 0; i < takeFirst && list[i]; i++) {
-                        picked.push({ ...list[i], segment: segNames[0] } as { titolo: string; descrizione: string; tipo: string; segment: string });
+                        picked.push({
+                          ...list[i],
+                          segment: segNames[0],
+                        } as {
+                          titolo: string;
+                          descrizione: string;
+                          tipo: string;
+                          segment: string;
+                          whatsapp_template?: string;
+                          email_subject?: string;
+                          email_template?: string;
+                        });
                       }
                     }
                     if (segNames[1]) {
                       const list = campaignsBySeg.get(segNames[1]) || [];
                       for (let i = 0; i < takeSecond && list[i]; i++) {
-                        picked.push({ ...list[i], segment: segNames[1] } as { titolo: string; descrizione: string; tipo: string; segment: string });
+                        picked.push({
+                          ...list[i],
+                          segment: segNames[1],
+                        } as {
+                          titolo: string;
+                          descrizione: string;
+                          tipo: string;
+                          segment: string;
+                          whatsapp_template?: string;
+                          email_subject?: string;
+                          email_template?: string;
+                        });
                       }
                     }
                     const toShow = picked.slice(0, 5);
@@ -507,6 +554,33 @@ export default function DashboardPage() {
                               <p className="text-xs font-medium text-[var(--text)] line-clamp-1">{camp.titolo}</p>
                               <p className="mt-0.5 text-[10px] text-[var(--muted)] line-clamp-2">{camp.descrizione}</p>
                               <span className="mt-1 inline-block rounded px-1.5 py-0.5 text-[10px] text-[var(--muted)] ring-1 ring-[var(--border)]">{camp.tipo}</span>
+                              <div className="mt-1.5 flex flex-wrap gap-1">
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    const ok = await copyTextToClipboard(camp.whatsapp_template || '');
+                                    if (!ok) window.alert('Copia WhatsApp non riuscita');
+                                  }}
+                                  className="inline-flex items-center gap-1 rounded border border-[var(--border)] px-1.5 py-0.5 text-[10px] text-[var(--muted)] hover:bg-[var(--bg)]/70"
+                                  title="Copia formato WhatsApp"
+                                >
+                                  <Copy className="h-3 w-3" />
+                                  WhatsApp
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    const emailText = `${camp.email_subject ? `Oggetto: ${camp.email_subject}\n\n` : ''}${camp.email_template || ''}`;
+                                    const ok = await copyTextToClipboard(emailText);
+                                    if (!ok) window.alert('Copia formato email non riuscita');
+                                  }}
+                                  className="inline-flex items-center gap-1 rounded border border-[var(--border)] px-1.5 py-0.5 text-[10px] text-[var(--muted)] hover:bg-[var(--bg)]/70"
+                                  title="Copia formato Email"
+                                >
+                                  <Copy className="h-3 w-3" />
+                                  Email
+                                </button>
+                              </div>
                             </div>
                           ))}
                         </div>
